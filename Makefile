@@ -18,6 +18,9 @@ $(BUILD_DIR):
 run: build
 	./$(BUILD_DIR)/$(EXEC)
 
+debug: build
+	gdb ./$(BUILD_DIR)/$(EXEC)
+
 clean:
 	rm -rf $(BUILD_DIR)
 
