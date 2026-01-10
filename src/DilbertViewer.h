@@ -2,12 +2,14 @@
 
 #include <qcontainerfwd.h>
 #include <qpixmap.h>
+
+#include <QComboBox>
+#include <QCompleter>
 #include <QDate>
 #include <QLabel>
+#include <QListWidget>
 #include <QMainWindow>
 #include <QPushButton>
-#include <QCompleter>
-#include <QListWidget>
 #include <QSql>
 #include <QSqlDatabase>
 
@@ -23,6 +25,8 @@ private slots:
     void onGalleryItemClicked(QListWidgetItem* item);
 
 private:
+    enum class SearchMode { Tag, Date, Transcript };
+
     QSqlDatabase db;
 
     QTabWidget* tabs;
@@ -37,12 +41,17 @@ private:
     QDate lastComicDate;
     QDate currentComicDate;
     QPixmap currentComic;
+    QComboBox* searchModeBox;
+
+    SearchMode currentSearchMode;
 
     QString generateFilePath(const QDate& date);
     QDate generateRandomDate();
 
     QStringList getAllComicTags();
     QStringList getImagePathsForTag(const QString& tag);
+    QStringList getImagePathsForTranscript(const QString& searchTerm);
+    QStringList getImagePathsForDate(const QString& dateStr);
 
     void resizeEvent(QResizeEvent* event) override;
 

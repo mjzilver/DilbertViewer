@@ -7,6 +7,7 @@
 #include <qsqlquery.h>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDebug>
 #include <QFile>
 #include <QHBoxLayout>
@@ -21,8 +22,8 @@
 
 QStringList DilbertViewer::getAllComicTags() {
     QStringList titles;
+
     if (!db.isOpen()) {
-        qDebug() << "getAllComicTags could not connect to db";
         return titles;
     }
 
@@ -32,17 +33,13 @@ QStringList DilbertViewer::getAllComicTags() {
     }
 
     qDebug() << titles.length() << " tags found";
-
     return titles;
 }
 
 QStringList DilbertViewer::getImagePathsForTag(const QString& tag) {
     QStringList paths;
 
-    if (!db.isOpen()) {
-        qDebug() << "getImagePathsForTag could not connect to db";
-        return paths;
-    }
+    if (!db.isOpen()) return paths;
 
     QSqlQuery query(db);
     query.prepare(
@@ -56,7 +53,7 @@ QStringList DilbertViewer::getImagePathsForTag(const QString& tag) {
     query.bindValue(":tag", tag);
 
     if (!query.exec()) {
-        qDebug() << "Query failed:" << query.lastError().text();
+        qDebug() << query.lastError().text();
         return paths;
     }
 
@@ -64,7 +61,49 @@ QStringList DilbertViewer::getImagePathsForTag(const QString& tag) {
         paths << query.value(0).toString();
     }
 
-    qDebug() << paths.length() << " images found for " << tag;
+    return paths;
+}
+
+QStringList DilbertViewer::getImagePathsForDate(const QString& dateStr) {
+    QStringList paths;
+
+    if (!db.isOpen()) return paths;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT image_path FROM comics WHERE date = :date");
+    query.bindValue(":date", dateStr);
+
+    if (!query.exec()) {
+        qDebug() << query.lastError().text();
+        return paths;
+    }
+
+    while (query.next()) {
+        paths << query.value(0).toString();
+    }
+
+    return paths;
+}
+
+QStringList DilbertViewer::getImagePathsForTranscript(const QString& searchTerm) {
+    QStringList paths;
+
+    if (!db.isOpen()) return paths;
+
+    QSqlQuery query(db);
+    query.prepare(
+        "SELECT image_path FROM comics "
+        "WHERE transcript LIKE :text");
+    query.bindValue(":text", "%" + searchTerm + "%");
+
+    if (!query.exec()) {
+        qDebug() << query.lastError().text();
+        return paths;
+    }
+
+    while (query.next()) {
+        paths << query.value(0).toString();
+    }
 
     return paths;
 }
@@ -82,28 +121,25 @@ DilbertViewer::DilbertViewer(QWidget* parent)
 
     QWidget* central = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(central);
-
     tabs = new QTabWidget(central);
 
     QWidget* viewerTab = new QWidget();
     QVBoxLayout* viewerLayout = new QVBoxLayout(viewerTab);
 
-    titleLabel = new QLabel("No comic loaded", viewerTab);
+    titleLabel = new QLabel("No comic loaded");
     titleLabel->setAlignment(Qt::AlignCenter);
-    QFont titleFont("Arial", 24, QFont::Bold);
-    titleLabel->setFont(titleFont);
+    titleLabel->setFont(QFont("Arial", 24, QFont::Bold));
 
-    imageLabel = new QLabel(viewerTab);
+    imageLabel = new QLabel();
     imageLabel->setAlignment(Qt::AlignCenter);
-    imageLabel->setMinimumSize(400, 300);
     imageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    imageLabel->setScaledContents(false);
 
-    QWidget* buttonWidget = new QWidget(viewerTab);
+    QWidget* buttonWidget = new QWidget();
     QHBoxLayout* buttonLayout = new QHBoxLayout(buttonWidget);
-    prevButton = new QPushButton("Previous", buttonWidget);
-    randButton = new QPushButton("Random", buttonWidget);
-    nextButton = new QPushButton("Next", buttonWidget);
+    prevButton = new QPushButton("Previous");
+    randButton = new QPushButton("Random");
+    nextButton = new QPushButton("Next");
+
     buttonLayout->addWidget(prevButton);
     buttonLayout->addWidget(randButton);
     buttonLayout->addWidget(nextButton);
@@ -117,25 +153,46 @@ DilbertViewer::DilbertViewer(QWidget* parent)
     QWidget* searchTab = new QWidget();
     QVBoxLayout* searchLayout = new QVBoxLayout(searchTab);
 
+    searchModeBox = new QComboBox(searchTab);
+    searchModeBox->addItems({"Tag", "Date", "Transcript"});
+
     QLineEdit* searchEdit = new QLineEdit(searchTab);
     searchEdit->setPlaceholderText("Search by tag...");
 
-    search = new QCompleter(searchTab);
-    search->setModel(new QStringListModel(getAllComicTags(), search));
+    QHBoxLayout* searchBarLayout = new QHBoxLayout();
+    searchBarLayout->addWidget(searchModeBox);
+    searchBarLayout->addWidget(searchEdit);
+
+    searchLayout->addLayout(searchBarLayout);
+
+    search = new QCompleter(getAllComicTags(), this);
     search->setCaseSensitivity(Qt::CaseInsensitive);
     searchEdit->setCompleter(search);
 
-    searchLayout->addWidget(searchEdit);
+    currentSearchMode = SearchMode::Tag;
+
+    connect(searchModeBox, &QComboBox::currentIndexChanged, this, [this, searchEdit](int index) {
+        currentSearchMode = static_cast<SearchMode>(index);
+
+        if (index == 0) {
+            searchEdit->setPlaceholderText("Search by tag...");
+            searchEdit->setCompleter(search);
+        } else if (index == 1) {
+            searchEdit->setPlaceholderText("Search by date (YYYY-MM-DD)...");
+            searchEdit->setCompleter(nullptr);
+        } else {
+            searchEdit->setPlaceholderText("Search transcript text...");
+            searchEdit->setCompleter(nullptr);
+        }
+    });
 
     galleryWidget = new QListWidget(searchTab);
     galleryWidget->setViewMode(QListView::IconMode);
     galleryWidget->setIconSize(QSize(150, 150));
     galleryWidget->setResizeMode(QListView::Adjust);
     galleryWidget->setSpacing(10);
-    galleryWidget->setMovement(QListView::Static);
 
     searchLayout->addWidget(galleryWidget);
-
     tabs->addTab(searchTab, "Search");
 
     mainLayout->addWidget(tabs);
@@ -152,23 +209,33 @@ DilbertViewer::DilbertViewer(QWidget* parent)
 }
 
 void DilbertViewer::onSearchReturnPressed() {
-    QLineEdit* searchEdit = qobject_cast<QLineEdit*>(sender());
-    if (!searchEdit) return;
+    QLineEdit* edit = qobject_cast<QLineEdit*>(sender());
+    if (!edit) return;
 
-    QString tag = searchEdit->text();
     galleryWidget->clear();
+    QString query = edit->text().trimmed();
+    if (query.isEmpty()) return;
 
-    QStringList imagePaths = getImagePathsForTag(tag);
+    QStringList paths;
 
-    for (const QString& path : imagePaths) {
-        QString fullPath = QString("./Dilbert/%1").arg(path);
-        if (!QFile::exists(fullPath))  {
-            qDebug() << fullPath << " file does not exist";
-            continue;
-        };
+    switch (currentSearchMode) {
+        case SearchMode::Tag:
+            paths = getImagePathsForTag(query);
+            break;
+        case SearchMode::Date:
+            paths = getImagePathsForDate(query);
+            break;
+        case SearchMode::Transcript:
+            paths = getImagePathsForTranscript(query);
+            break;
+    }
+
+    for (const QString& path : paths) {
+        QString fullPath = "./Dilbert/" + path;
+        if (!QFile::exists(fullPath)) continue;
 
         QPixmap pix(fullPath);
-        QListWidgetItem* item = new QListWidgetItem(
+        auto* item = new QListWidgetItem(
             QIcon(pix.scaled(150, 150, Qt::KeepAspectRatio, Qt::SmoothTransformation)), "");
         item->setData(Qt::UserRole, fullPath);
         galleryWidget->addItem(item);
@@ -181,14 +248,12 @@ void DilbertViewer::onGalleryItemClicked(QListWidgetItem* item) {
     imageLabel->setPixmap(
         currentComic.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     titleLabel->setText(QFileInfo(path).baseName());
-
     tabs->setCurrentIndex(0);
 }
 
 QDate DilbertViewer::generateRandomDate() {
-    int daysRange = firstComicDate.daysTo(lastComicDate);
-    int randomOffset = QRandomGenerator::global()->bounded(daysRange + 1);
-    return firstComicDate.addDays(randomOffset);
+    int days = firstComicDate.daysTo(lastComicDate);
+    return firstComicDate.addDays(QRandomGenerator::global()->bounded(days + 1));
 }
 
 QString DilbertViewer::generateFilePath(const QDate& date) {
@@ -200,9 +265,7 @@ QString DilbertViewer::generateFilePath(const QDate& date) {
 
 void DilbertViewer::loadAndDisplay(const QDate& date) {
     QString path = generateFilePath(date);
-
     while (!QFile::exists(path)) {
-        qDebug() << "Comic does not exist:" << path;
         path = generateFilePath(generateRandomDate());
     }
 
@@ -210,40 +273,27 @@ void DilbertViewer::loadAndDisplay(const QDate& date) {
     imageLabel->setPixmap(
         currentComic.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
-    titleLabel->setText(
-        QString("Dilbert: %1-%2-%3").arg(date.year()).arg(date.month()).arg(date.day()));
-
+    titleLabel->setText(QString("Dilbert: %1").arg(date.toString("yyyy-MM-dd")));
     currentComicDate = date;
 }
 
-void DilbertViewer::resizeEvent(QResizeEvent* event) {
-    QMainWindow::resizeEvent(event);
-
+void DilbertViewer::resizeEvent(QResizeEvent* e) {
+    QMainWindow::resizeEvent(e);
     if (!currentComic.isNull()) {
         imageLabel->setPixmap(
             currentComic.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
 }
 
-void DilbertViewer::showRandom() {
-    QDate randomDate = generateRandomDate();
-    loadAndDisplay(randomDate);
-}
+void DilbertViewer::showRandom() { loadAndDisplay(generateRandomDate()); }
 
 void DilbertViewer::showPrevious() {
-    if (currentComicDate > firstComicDate) {
-        loadAndDisplay(currentComicDate.addDays(-1));
-    }
+    if (currentComicDate > firstComicDate) loadAndDisplay(currentComicDate.addDays(-1));
 }
-
 void DilbertViewer::showNext() {
-    if (currentComicDate < lastComicDate) {
-        loadAndDisplay(currentComicDate.addDays(1));
-    }
+    if (currentComicDate < lastComicDate) loadAndDisplay(currentComicDate.addDays(1));
 }
 
 DilbertViewer::~DilbertViewer() {
-    if (db.isOpen()) {
-        db.close();
-    }
+    if (db.isOpen()) db.close();
 }

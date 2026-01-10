@@ -12,7 +12,7 @@ import random
 FIRST_COMIC = datetime.date(1989, 4, 16)
 LAST_COMIC = datetime.date(2023, 3, 12)
 BASE_DIR = Path("../Dilbert")
-CONCURRENCY = 3
+CONCURRENCY = 4
 LOG_FILE = "dilbert_downloader.log"
 
 HEADERS = {
@@ -33,7 +33,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 TIMEOUT = httpx.Timeout(
     connect=10.0,
-    read=100.0, # Web archive can be super slow
+    read=100.0,  # Web archive can be super slow
     write=10.0,
     pool=10.0,
 )
