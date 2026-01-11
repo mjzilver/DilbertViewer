@@ -2,9 +2,12 @@
 
 #include <qboxlayout.h>
 #include <qcompleter.h>
+#include <qcontainerfwd.h>
 #include <qdebug.h>
 #include <qlogging.h>
 #include <qsqlquery.h>
+#include <qstyle.h>
+#include <qwidget.h>
 
 #include <QApplication>
 #include <QComboBox>
@@ -35,76 +38,109 @@ QStringList DilbertViewer::getAllComicTags() {
     return titles;
 }
 
-QStringList DilbertViewer::getImagePathsForTag(const QString& tag) {
-    QStringList paths;
+QStringList DilbertViewer::getTagsForCurrentComic() {
+    QStringList tags;
 
-    if (!db.isOpen()) return paths;
+    if (!db.isOpen()) return tags;
 
     QSqlQuery query(db);
     query.prepare(
-        "SELECT comics.image_path "
+        "SELECT tags.name FROM tags "
+        "INNER JOIN comic_tags ON comic_tags.tag_id = tags.id "
+        "INNER JOIN comics ON comics.date = comic_tags.comic_date "
+        "WHERE comics.date = :date");
+    query.bindValue(":date", currentComicDate.toString("yyyy-MM-dd"));
+
+    if (!query.exec()) {
+        qDebug() << "getTagsForCurrentComic - SQLERR: " << query.lastError().text();
+        return tags;
+    }
+
+    while (query.next()) {
+        tags << query.value(0).toString();
+    }
+
+    return tags;
+}
+
+QList<ComicItem> DilbertViewer::getComicsForTag(const QString& tag) {
+    QList<ComicItem> comics;
+    if (!db.isOpen()) return comics;
+
+    QSqlQuery query(db);
+    query.prepare(
+        "SELECT comics.date, comics.image_path "
         "FROM comics "
         "INNER JOIN comic_tags ON comic_tags.comic_date = comics.date "
         "INNER JOIN tags ON tags.id = comic_tags.tag_id "
         "WHERE tags.name = :tag "
         "ORDER BY comics.date ASC");
-
     query.bindValue(":tag", tag);
 
     if (!query.exec()) {
         qDebug() << query.lastError().text();
-        return paths;
+        return comics;
     }
 
     while (query.next()) {
-        paths << query.value(0).toString();
+        ComicItem item;
+        item.date = QDate::fromString(query.value(0).toString(), "yyyy-MM-dd");
+        item.path = query.value(1).toString();
+        comics.append(item);
     }
 
-    return paths;
+    return comics;
 }
 
-QStringList DilbertViewer::getImagePathsForDate(const QString& dateStr) {
-    QStringList paths;
+QList<ComicItem> DilbertViewer::getComicsForDate(const QString& dateStr) {
+    QList<ComicItem> comics;
 
-    if (!db.isOpen()) return paths;
+    if (!db.isOpen()) return comics;
 
     QSqlQuery query(db);
-    query.prepare("SELECT image_path FROM comics WHERE date = :date");
+    query.prepare("SELECT date, image_path FROM comics WHERE date = :date");
     query.bindValue(":date", dateStr);
 
     if (!query.exec()) {
         qDebug() << query.lastError().text();
-        return paths;
+        return comics;
     }
 
-    while (query.next()) {
-        paths << query.value(0).toString();
+   while (query.next()) {
+        ComicItem item;
+        item.date = QDate::fromString(query.value(0).toString(), "yyyy-MM-dd");
+        item.path = query.value(1).toString();
+        comics.append(item);
     }
 
-    return paths;
+    return comics;
 }
 
-QStringList DilbertViewer::getImagePathsForTranscript(const QString& searchTerm) {
-    QStringList paths;
+QList<ComicItem> DilbertViewer::getComicsForTranscript(const QString& searchTerm) {
+    QList<ComicItem> comics;
 
-    if (!db.isOpen()) return paths;
+    if (!db.isOpen()) return comics;
 
     QSqlQuery query(db);
     query.prepare(
-        "SELECT image_path FROM comics "
+        "SELECT date, image_path FROM comics "
         "WHERE transcript LIKE :text");
     query.bindValue(":text", "%" + searchTerm + "%");
 
     if (!query.exec()) {
         qDebug() << query.lastError().text();
-        return paths;
+        return comics;
     }
 
     while (query.next()) {
-        paths << query.value(0).toString();
+        ComicItem item;
+        item.date = QDate::fromString(query.value(0).toString(), "yyyy-MM-dd");
+        item.path = query.value(1).toString();
+        comics.append(item);
     }
 
-    return paths;
+
+    return comics;
 }
 
 DilbertViewer::DilbertViewer(QWidget* parent)
@@ -143,8 +179,12 @@ DilbertViewer::DilbertViewer(QWidget* parent)
     buttonLayout->addWidget(randButton);
     buttonLayout->addWidget(nextButton);
 
+    QWidget* descriptionWidget = new QWidget();
+    tagLayout = new QHBoxLayout(descriptionWidget);
+
     viewerLayout->addWidget(titleLabel);
     viewerLayout->addWidget(imageLabel);
+    viewerLayout->addWidget(descriptionWidget);
     viewerLayout->addWidget(buttonWidget);
 
     tabs->addTab(viewerTab, "Viewer");
@@ -211,43 +251,51 @@ void DilbertViewer::onSearchReturnPressed() {
     QLineEdit* edit = qobject_cast<QLineEdit*>(sender());
     if (!edit) return;
 
-    galleryWidget->clear();
     QString query = edit->text().trimmed();
+    performSearch(query, currentSearchMode);
+}
+
+void DilbertViewer::performSearch(const QString& query, SearchMode mode) {
     if (query.isEmpty()) return;
 
-    QStringList paths;
+    galleryWidget->clear();
+    QList<ComicItem> comics;
 
-    switch (currentSearchMode) {
+    switch (mode) {
         case SearchMode::Tag:
-            paths = getImagePathsForTag(query);
+            comics = getComicsForTag(query);
             break;
         case SearchMode::Date:
-            paths = getImagePathsForDate(query);
+            comics = getComicsForDate(query);
             break;
         case SearchMode::Transcript:
-            paths = getImagePathsForTranscript(query);
+            comics = getComicsForTranscript(query);
             break;
     }
 
-    for (const QString& path : paths) {
-        QString fullPath = "./Dilbert/" + path;
+    for (const ComicItem& comic : comics) {
+        QString fullPath = "./Dilbert/" + comic.path;
         if (!QFile::exists(fullPath)) continue;
 
         QPixmap pix(fullPath);
         auto* item = new QListWidgetItem(
             QIcon(pix.scaled(150, 150, Qt::KeepAspectRatio, Qt::SmoothTransformation)), "");
-        item->setData(Qt::UserRole, fullPath);
+
+        item->setData(Qt::UserRole, comic.date);
+
         galleryWidget->addItem(item);
     }
+
+    tabs->setCurrentIndex(1);
 }
 
+
 void DilbertViewer::onGalleryItemClicked(QListWidgetItem* item) {
-    QString path = item->data(Qt::UserRole).toString();
-    currentComic.load(path);
-    imageLabel->setPixmap(
-        currentComic.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    titleLabel->setText(QFileInfo(path).baseName());
-    tabs->setCurrentIndex(0);
+    QDate date = item->data(Qt::UserRole).toDate();
+    if (date.isValid()) {
+        loadAndDisplay(date);
+        tabs->setCurrentIndex(0);
+    }
 }
 
 QDate DilbertViewer::generateRandomDate() {
@@ -274,6 +322,8 @@ void DilbertViewer::loadAndDisplay(const QDate& date) {
 
     titleLabel->setText(QString("Dilbert: %1").arg(date.toString("yyyy-MM-dd")));
     currentComicDate = date;
+
+    updateTagButtons();
 }
 
 void DilbertViewer::resizeEvent(QResizeEvent* e) {
@@ -281,6 +331,32 @@ void DilbertViewer::resizeEvent(QResizeEvent* e) {
     if (!currentComic.isNull()) {
         imageLabel->setPixmap(
             currentComic.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+}
+
+void DilbertViewer::updateTagButtons() {
+    QLayoutItem* child;
+    while ((child = tagLayout->takeAt(0)) != nullptr) {
+        if (QWidget* w = child->widget()) {
+            w->deleteLater();
+        }
+        delete child;
+    }
+
+    QStringList tags = getTagsForCurrentComic();
+    for (const QString& tag : tags) {
+        QPushButton* btn = new QPushButton(tag);
+        btn->setStyleSheet("QPushButton { padding: 2px 6px; margin: 0px; }");
+        btn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
+        btn->setFlat(true);
+
+        connect(btn, &QPushButton::clicked, this, [this, tag]() {
+            currentSearchMode = SearchMode::Tag;
+            searchModeBox->setCurrentIndex(static_cast<int>(SearchMode::Tag));
+            performSearch(tag, currentSearchMode);
+        });
+
+        tagLayout->addWidget(btn);
     }
 }
 
