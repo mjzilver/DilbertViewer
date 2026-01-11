@@ -18,6 +18,7 @@ public:
     enum Mode { Tag, Date, Transcript };
 
     void showResults(const QList<ComicItem>& comics);
+    void setInput(const QString& str);
 
 signals:
     void searchRequested(const QString& query, Mode mode);

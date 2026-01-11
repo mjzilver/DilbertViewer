@@ -1,9 +1,13 @@
 #include "DilbertViewer.h"
 
+#include <qcontainerfwd.h>
+
 #include <QFile>
 #include <QPixmap>
 #include <QRandomGenerator>
 #include <QTabWidget>
+
+#include "ComicViewerWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dilbert/metadata.db") {
     auto* tabs = new QTabWidget(this);
@@ -30,8 +34,15 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
         for (ComicItem& c : comics) c.path = "./Dilbert/" + c.path;
 
         search->showResults(comics);
+        search->setInput(tag);
         tabs->setCurrentIndex(1);
     });
+
+    connect(viewer, &ComicViewerWidget::tagEdited, this,
+            [this](const QString& oldTag, const QString& newTag) {
+                repo.editTag(oldTag, newTag);
+                viewer->setTags(repo.tagsForComic(currentDate));
+            });
 
     connect(search, &ComicSearchWidget::searchRequested, this,
             [this, tabs](const QString& q, ComicSearchWidget::Mode m) {

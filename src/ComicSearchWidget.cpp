@@ -51,6 +51,8 @@ void ComicSearchWidget::showResults(const QList<ComicItem>& comics) {
     thumbTimer.start(0);
 }
 
+void ComicSearchWidget::setInput(const QString& str) { edit->setText(str); }
+
 void ComicSearchWidget::loadNextThumbnail() {
     if (pending.isEmpty()) {
         thumbTimer.stop();

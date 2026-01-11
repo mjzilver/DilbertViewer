@@ -16,6 +16,8 @@ public:
     QList<ComicItem> comicsForDate(const QString& date) const;
     QList<ComicItem> comicsForTranscript(const QString& text) const;
 
+    void editTag(const QString& oldTag, const QString& newTag);
+
 private:
     QSqlDatabase db;
 };

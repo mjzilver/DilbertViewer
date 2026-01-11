@@ -97,3 +97,18 @@ QList<ComicItem> ComicRepository::comicsForTranscript(const QString& text) const
 
     return out;
 }
+
+void ComicRepository::editTag(const QString& oldTag, const QString& newTag) {
+    QSqlQuery q(db);
+
+    q.prepare(
+        "UPDATE tags "
+        "SET name = :new "
+        "WHERE name = :old;");
+    q.bindValue(":old", oldTag);
+    q.bindValue(":new", newTag);
+
+    if (!q.exec()) {
+        qDebug() << "Failed to update tag:" << q.lastError().text();
+    }
+}

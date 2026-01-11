@@ -16,11 +16,11 @@ $(VENV_DIR):
 install: $(VENV_DIR)
 	$(PIP) install -r $(REQS)
 
-run: $(VENV_DIR)
+run: $(VENV_DIR) install
 	$(PY) $(ENTRY)
-
+	
 format: $(VENV_DIR)
-	find $(SRC_DIR) -name $(ENTRY) -exec $(VENV_DIR)/bin/black {} +
+	$(VENV_DIR)/bin/black . --exclude "$(VENV_DIR)"
 
 clean:
 	rm -rf $(VENV_DIR)

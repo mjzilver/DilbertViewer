@@ -5,7 +5,7 @@ SRC_DIR := src
 CPP_FILES := $(shell find $(SRC_DIR) -name "*.cpp")
 H_FILES := $(shell find $(SRC_DIR) -name "*.h")
 
-.PHONY: all build build-debug run debug clean format release
+.PHONY: all build build-debug run debug valgrind clean format release
 
 all: run
 
@@ -23,6 +23,9 @@ run: build
 
 debug: build-debug
 	gdb ./$(BUILD_DIR)/$(EXEC)
+
+valgrind: build-debug
+	valgrind --leak-check=full ./$(BUILD_DIR)/$(EXEC)
 
 clean:
 	rm -rf $(BUILD_DIR)
