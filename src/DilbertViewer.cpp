@@ -32,7 +32,6 @@ QStringList DilbertViewer::getAllComicTags() {
         titles << query.value(0).toString();
     }
 
-    qDebug() << titles.length() << " tags found";
     return titles;
 }
 
