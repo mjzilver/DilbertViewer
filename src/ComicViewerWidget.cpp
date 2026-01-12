@@ -19,7 +19,7 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : Q
     image = new QLabel;
     image->setAlignment(Qt::AlignCenter);
     image->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    image->setMaximumSize(maximumWidth() * 0.8, maximumHeight() * 0.6);
+    image->setMinimumSize(0, 0);
 
     auto* prev = new QPushButton("Previous");
     auto* rand = new QPushButton("Random");
