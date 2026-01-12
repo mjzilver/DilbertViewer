@@ -101,6 +101,8 @@ QList<ComicItem> ComicRepository::comicsForTranscript(const QString& text) const
 }
 
 void ComicRepository::editTag(const QString& oldTag, const QString& newTag) {
+    if (oldTag == newTag) return;
+
     QSqlQuery q(db);
     q.prepare("SELECT id FROM tags WHERE name = :new");
     q.bindValue(":new", newTag);
