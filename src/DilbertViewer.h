@@ -4,6 +4,7 @@
 
 #include "ComicRepository.h"
 #include "ComicSearchWidget.h"
+#include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
 
 class DilbertViewer : public QMainWindow {
@@ -19,6 +20,7 @@ private:
     ComicRepository repo;
     ComicViewerWidget* viewer;
     ComicSearchWidget* search;
+    ComicTagsWidget* tags;
 
     QDate currentDate;
     const QDate first{1989, 4, 16};

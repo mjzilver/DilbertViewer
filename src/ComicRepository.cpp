@@ -1,5 +1,7 @@
 #include "ComicRepository.h"
 
+#include <qsqlquery.h>
+
 #include <QDebug>
 #include <QtSql>
 
@@ -100,15 +102,49 @@ QList<ComicItem> ComicRepository::comicsForTranscript(const QString& text) const
 
 void ComicRepository::editTag(const QString& oldTag, const QString& newTag) {
     QSqlQuery q(db);
-
-    q.prepare(
-        "UPDATE tags "
-        "SET name = :new "
-        "WHERE name = :old;");
-    q.bindValue(":old", oldTag);
+    q.prepare("SELECT id FROM tags WHERE name = :new");
     q.bindValue(":new", newTag);
 
     if (!q.exec()) {
-        qDebug() << "Failed to update tag:" << q.lastError().text();
+        qDebug() << "Failed to query new tag:" << q.lastError().text();
+        return;
+    }
+
+    if (q.next()) {
+        int newId = q.value(0).toInt();
+
+        QSqlQuery oldIdQuery(db);
+        oldIdQuery.prepare("SELECT id FROM tags WHERE name = :old");
+        oldIdQuery.bindValue(":old", oldTag);
+        if (!oldIdQuery.exec() || !oldIdQuery.next()) {
+            qDebug() << "Old tag not found:" << oldTag;
+            return;
+        }
+        int oldId = oldIdQuery.value(0).toInt();
+
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE comic_tags SET tag_id = :newId WHERE tag_id = :oldId");
+        updateQuery.bindValue(":newId", newId);
+        updateQuery.bindValue(":oldId", oldId);
+        if (!updateQuery.exec()) {
+            qDebug() << "Failed to update comic_tags:" << updateQuery.lastError().text();
+            return;
+        }
+
+        QSqlQuery deleteQuery(db);
+        deleteQuery.prepare("DELETE FROM tags WHERE id = :oldId");
+        deleteQuery.bindValue(":oldId", oldId);
+        if (!deleteQuery.exec()) {
+            qDebug() << "Failed to delete old tag:" << deleteQuery.lastError().text();
+        }
+
+    } else {
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE tags SET name = :new WHERE name = :old");
+        updateQuery.bindValue(":new", newTag);
+        updateQuery.bindValue(":old", oldTag);
+        if (!updateQuery.exec()) {
+            qDebug() << "Failed to update tag name:" << updateQuery.lastError().text();
+        }
     }
 }

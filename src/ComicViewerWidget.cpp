@@ -11,7 +11,7 @@
 #include <QScreen>
 #include <QVBoxLayout>
 
-ComicViewerWidget::ComicViewerWidget(QWidget* parent) : QWidget(parent) {
+ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : QWidget(parent) {
     title = new QLabel("No comic");
     title->setAlignment(Qt::AlignCenter);
     title->setFont(QFont("Arial", 24, QFont::Bold));
@@ -19,15 +19,7 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent) : QWidget(parent) {
     image = new QLabel;
     image->setAlignment(Qt::AlignCenter);
     image->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    QScreen* screen = QGuiApplication::primaryScreen();
-    QSize screenSize = screen->availableGeometry().size();
-    image->setMaximumSize(screenSize.width() * 0.8, screenSize.height() * 0.6);
-
-    tagLayout = new QHBoxLayout;
-    QWidget* tagWidget = new QWidget;
-    tagWidget->setLayout(tagLayout);
-
-    tagWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    image->setMaximumSize(maximumWidth() * 0.8, maximumHeight() * 0.6);
 
     auto* prev = new QPushButton("Previous");
     auto* rand = new QPushButton("Random");
@@ -45,7 +37,7 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     layout->addWidget(title);
     layout->addWidget(image);
-    layout->addWidget(tagWidget);
+    layout->addWidget(tags);
     layout->addLayout(nav);
 }
 
@@ -59,63 +51,4 @@ void ComicViewerWidget::resizeEvent(QResizeEvent*) {
     if (!current.isNull())
         image->setPixmap(
             current.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-}
-
-void ComicViewerWidget::setTags(const QStringList& tags) {
-    QLayoutItem* item;
-    while ((item = tagLayout->takeAt(0))) {
-        delete item->widget();
-        delete item;
-    }
-
-    if (tags.isEmpty()) {
-        auto* label = new QLabel("No tags found");
-        label->setEnabled(false);
-        label->setStyleSheet("color: gray;");
-        tagLayout->addWidget(label);
-        return;
-    }
-
-    for (const QString& tag : tags) {
-        auto* btn = new QPushButton(tag);
-        btn->setFlat(true);
-        btn->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-        connect(btn, &QPushButton::clicked, this, [this, tag] { emit tagSelected(tag); });
-        tagLayout->addWidget(btn);
-    }
-
-    auto* editBtn = new QPushButton("Edit tags");
-    connect(editBtn, &QPushButton::clicked, this, [this, tags] { emit editTags(tags); });
-    tagLayout->addWidget(editBtn);
-}
-
-void ComicViewerWidget::editTags(const QStringList& tags) {
-    QDialog* dialog = new QDialog(this);
-    dialog->setWindowTitle("Edit Tags");
-
-    QVBoxLayout* layout = new QVBoxLayout(dialog);
-
-    for (const QString& tag : tags) {
-        QHBoxLayout* rowLayout = new QHBoxLayout;
-        QLineEdit* lineEdit = new QLineEdit(tag);
-        QPushButton* saveBtn = new QPushButton("Save");
-
-        rowLayout->addWidget(lineEdit);
-        rowLayout->addWidget(saveBtn);
-
-        connect(saveBtn, &QPushButton::clicked, this, [this, lineEdit, &tag]() {
-            auto newTag = lineEdit->text();
-            emit tagEdited(tag, newTag);
-        });
-
-        layout->addLayout(rowLayout);
-    }
-
-    QPushButton* closeBtn = new QPushButton("Close");
-    layout->addWidget(closeBtn);
-    connect(closeBtn, &QPushButton::clicked, dialog, &QDialog::accept);
-
-    dialog->setLayout(layout);
-    dialog->setModal(false);
-    dialog->show();
 }

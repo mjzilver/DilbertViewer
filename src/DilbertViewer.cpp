@@ -3,16 +3,27 @@
 #include <qcontainerfwd.h>
 
 #include <QFile>
+#include <QGuiApplication>
 #include <QPixmap>
 #include <QRandomGenerator>
+#include <QScreen>
 #include <QTabWidget>
 
+#include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dilbert/metadata.db") {
+    QScreen* screen = QGuiApplication::primaryScreen();
+    QSize screenSize = screen->availableGeometry().size();
+
     auto* tabs = new QTabWidget(this);
 
-    viewer = new ComicViewerWidget;
+    tags = new ComicTagsWidget();
+    viewer = new ComicViewerWidget(this, tags);
+
+    viewer->setMaximumSize(screenSize.width() * 0.8, screenSize.height() * 0.6);
+    tags->setMaximumSize(screenSize.width() * 0.8, screenSize.height() * 0.1);
+
     search = new ComicSearchWidget(repo.allTags());
 
     tabs->addTab(viewer, "Viewer");
@@ -29,7 +40,7 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
 
     connect(viewer, &ComicViewerWidget::randomRequested, this, [this] { loadComic(randomDate()); });
 
-    connect(viewer, &ComicViewerWidget::tagSelected, this, [this, tabs](const QString& tag) {
+    connect(tags, &ComicTagsWidget::tagSelected, this, [this, tabs](const QString& tag) {
         auto comics = repo.comicsForTag(tag);
         for (ComicItem& c : comics) c.path = "./Dilbert/" + c.path;
 
@@ -38,10 +49,10 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
         tabs->setCurrentIndex(1);
     });
 
-    connect(viewer, &ComicViewerWidget::tagEdited, this,
+    connect(tags, &ComicTagsWidget::tagEdited, this,
             [this](const QString& oldTag, const QString& newTag) {
                 repo.editTag(oldTag, newTag);
-                viewer->setTags(repo.tagsForComic(currentDate));
+                tags->setTags(repo.tagsForComic(currentDate));
             });
 
     connect(search, &ComicSearchWidget::searchRequested, this,
@@ -95,5 +106,5 @@ void DilbertViewer::loadComic(const QDate& date) {
     currentDate = date;
 
     viewer->showComic(date, pix);
-    viewer->setTags(repo.tagsForComic(date));
+    tags->setTags(repo.tagsForComic(date));
 }
