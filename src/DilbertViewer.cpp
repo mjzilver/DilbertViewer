@@ -1,6 +1,8 @@
 #include "DilbertViewer.h"
 
 #include <qcontainerfwd.h>
+#include <qsize.h>
+#include <qsizepolicy.h>
 
 #include <QFile>
 #include <QGuiApplication>
@@ -20,17 +22,12 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
 
     tags = new ComicTagsWidget();
     viewer = new ComicViewerWidget(this, tags);
-
-    viewer->setMaximumSize(screenSize.width() * 0.8, screenSize.height() * 0.6);
-    tags->setMaximumSize(screenSize.width() * 0.8, screenSize.height() * 0.1);
-
     search = new ComicSearchWidget(repo.allTags());
 
     tabs->addTab(viewer, "Viewer");
     tabs->addTab(search, "Search");
 
     setCentralWidget(tabs);
-    resize(800, 600);
 
     connect(viewer, &ComicViewerWidget::previousRequested, this,
             [this] { loadComic(currentDate.addDays(-1)); });

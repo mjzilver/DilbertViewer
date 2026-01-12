@@ -77,14 +77,17 @@ QPushButton* ComicTagsWidget::createButton(const QString& text, bool flat,
                                            std::function<void()> onClick) {
     auto* btn = new QPushButton(text);
     btn->setFlat(flat);
-    btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    btn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    QFontMetrics fm(btn->font());
+    int minWidth = fm.horizontalAdvance(text) + 20;
+    btn->setMinimumWidth(minWidth);
     connect(btn, &QPushButton::clicked, this, onClick);
     return btn;
 }
 
 void ComicTagsWidget::placeWidget(QWidget* w) {
     int wWidth = widgetTextWidth(w);
-    int maxWidth = contentsRect().width();
+    int maxWidth = parentWidget() ? parentWidget()->width() : contentsRect().width();
     QHBoxLayout* row = rows.last();
 
     if (rowWidth(row) + wWidth > maxWidth && row->count() > 0) {
@@ -99,7 +102,7 @@ int ComicTagsWidget::rowWidth(QHBoxLayout* row) const {
     int width = 0;
     for (int i = 0; i < row->count(); ++i) {
         if (auto* w = row->itemAt(i)->widget()) {
-            width += widgetTextWidth(w) + row->spacing();
+            width += widgetTextWidth(w);
         }
     }
     return width;
@@ -113,12 +116,12 @@ void ComicTagsWidget::repositionWidgets() {
     rows.clear();
     createNewRow();
 
-    int maxWidth = contentsRect().width();
+    int maxWidth = parentWidget() ? parentWidget()->width() : contentsRect().width();
     int currentWidth = 0;
     QHBoxLayout* row = rows.last();
 
     for (auto* w : allWidgets) {
-        int wWidth = widgetTextWidth(w) + row->spacing();
+        int wWidth = widgetTextWidth(w);
         if (currentWidth + wWidth > maxWidth && row->count() > 0) {
             createNewRow();
             row = rows.last();

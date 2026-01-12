@@ -1,6 +1,7 @@
 #include "ComicViewerWidget.h"
 
 #include <qlineedit.h>
+#include <qnamespace.h>
 
 #include <QDialog>
 #include <QGuiApplication>
@@ -18,8 +19,8 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : Q
 
     image = new QLabel;
     image->setAlignment(Qt::AlignCenter);
-    image->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    image->setMinimumSize(0, 0);
+    image->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Ignored);
+    image->setMinimumSize(400, 200);
 
     auto* prev = new QPushButton("Previous");
     auto* rand = new QPushButton("Random");
@@ -35,9 +36,10 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : Q
     nav->addWidget(next);
 
     auto* layout = new QVBoxLayout(this);
+
     layout->addWidget(title);
-    layout->addWidget(image);
-    layout->addWidget(tags);
+    layout->addWidget(image, 1);
+    layout->addWidget(tags, 0, Qt::AlignBottom);
     layout->addLayout(nav);
 }
 
