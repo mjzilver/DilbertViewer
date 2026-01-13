@@ -12,6 +12,8 @@ class DilbertViewer : public QMainWindow {
 public:
     explicit DilbertViewer(QWidget* parent = nullptr);
 
+    void keyPressEvent(QKeyEvent* event) override;
+
 private:
     void loadComic(const QDate& date);
     QDate randomDate() const;

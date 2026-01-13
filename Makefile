@@ -5,15 +5,17 @@ SRC_DIR := src
 CPP_FILES := $(shell find $(SRC_DIR) -name "*.cpp")
 H_FILES := $(shell find $(SRC_DIR) -name "*.h")
 
+MAKE_FLAGS := -j$(shell nproc --ignore=1)
+
 .PHONY: all build build-debug run debug valgrind clean format release
 
 all: run
 
 build: $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Release .. && $(MAKE) $(EXEC)
+	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Release .. && $(MAKE) $(MAKE_FLAGS) $(EXEC)
 
 build-debug: $(BUILD_DIR)
-	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Debug .. && $(MAKE) $(EXEC)
+	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Debug .. && $(MAKE) $(MAKE_FLAGS) $(EXEC)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

@@ -1,55 +1,30 @@
 #pragma once
-#include <QDialog>
-#include <QFontMetrics>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QLineEdit>
-#include <QList>
+
 #include <QPushButton>
-#include <QVBoxLayout>
+#include <QStringList>
 #include <QWidget>
-#include <cmath>
+#include <functional>
+
+#include "FlowLayout.h"
 
 class ComicTagsWidget : public QWidget {
     Q_OBJECT
-
 public:
     explicit ComicTagsWidget(QWidget* parent = nullptr);
 
-    void setTags(const QStringList& tags);
+    void setTags(const QStringList& newTags);
 
 signals:
     void tagSelected(const QString& tag);
     void tagEdited(const QString& oldTag, const QString& newTag);
 
-protected:
-    void resizeEvent(QResizeEvent* event) override {
-        QWidget::resizeEvent(event);
-        repositionWidgets();
-    }
+public slots:
+    void openEditDialog();
 
 private:
-    QVBoxLayout* mainLayout;
-    QList<QWidget*> allWidgets;
-    QList<QHBoxLayout*> rows;
+    FlowLayout* layout;
+    QStringList tags;
 
-    int widgetTextWidth(QWidget* w) const;
-
-    void createNewRow();
-
-    void addWidget(QWidget* w);
-
-    void clearWidgets();
-
-    QLabel* createLabel(const QString& text, const QColor& color = Qt::black);
-
+    QWidget* createLabel(const QString& text, const QColor& color = Qt::black);
     QPushButton* createButton(const QString& text, bool flat, std::function<void()> onClick);
-
-    void placeWidget(QWidget* w);
-
-    int rowWidth(QHBoxLayout* row) const;
-
-    void repositionWidgets();
-
-    void openEditDialog(const QStringList& tags);
 };

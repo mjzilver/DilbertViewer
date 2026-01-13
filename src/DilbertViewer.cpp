@@ -1,28 +1,26 @@
 #include "DilbertViewer.h"
 
-#include <qcontainerfwd.h>
-#include <qsize.h>
-#include <qsizepolicy.h>
+#include <qnamespace.h>
 
 #include <QFile>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QPixmap>
 #include <QRandomGenerator>
 #include <QScreen>
+#include <QSize>
+#include <QSizePolicy>
 #include <QTabWidget>
 
 #include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dilbert/metadata.db") {
-    QScreen* screen = QGuiApplication::primaryScreen();
-    QSize screenSize = screen->availableGeometry().size();
-
     auto* tabs = new QTabWidget(this);
 
-    tags = new ComicTagsWidget();
+    tags = new ComicTagsWidget(this);
     viewer = new ComicViewerWidget(this, tags);
-    search = new ComicSearchWidget(repo.allTags());
+    search = new ComicSearchWidget(repo.allTags(), this);
 
     tabs->addTab(viewer, "Viewer");
     tabs->addTab(search, "Search");
@@ -82,6 +80,20 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
     });
 
     loadComic(randomDate());
+
+    resize(800, 600);
+}
+
+void DilbertViewer::keyPressEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_N) {
+        loadComic(currentDate.addDays(1));
+    } else if (event->key() == Qt::Key_P) {
+        loadComic(currentDate.addDays(-1));
+    } else if (event->key() == Qt::Key_R) {
+        loadComic(randomDate());
+    } else if (event->key() == Qt::Key_E) {
+        tags->openEditDialog();
+    }
 }
 
 QDate DilbertViewer::randomDate() const {

@@ -1,4 +1,7 @@
 #pragma once
+#include <qpixmap.h>
+#include <qpushbutton.h>
+
 #include <QDate>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -14,6 +17,7 @@ public:
     explicit ComicViewerWidget(QWidget* parent = nullptr, ComicTagsWidget* tags = nullptr);
 
     void showComic(const QDate& date, const QPixmap& pixmap);
+    void addButton(QPushButton* newBtn);
 
 signals:
     void previousRequested();
@@ -27,4 +31,5 @@ private:
     QLabel* title;
     QLabel* image;
     QPixmap current;
+    QHBoxLayout* nav;
 };

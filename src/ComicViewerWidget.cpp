@@ -1,16 +1,13 @@
 #include "ComicViewerWidget.h"
 
-#include <qlineedit.h>
-#include <qnamespace.h>
+#include <qpushbutton.h>
 
-#include <QDialog>
 #include <QGuiApplication>
 #include <QHBoxLayout>
-#include <QLabel>
-#include <QLineEdit>
 #include <QPushButton>
 #include <QScreen>
 #include <QVBoxLayout>
+#include "ComicTagsWidget.h"
 
 ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : QWidget(parent) {
     title = new QLabel("No comic");
@@ -25,18 +22,20 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : Q
     auto* prev = new QPushButton("Previous");
     auto* rand = new QPushButton("Random");
     auto* next = new QPushButton("Next");
+    auto* edit = new QPushButton("Edit tags");
 
     connect(prev, &QPushButton::clicked, this, &ComicViewerWidget::previousRequested);
     connect(rand, &QPushButton::clicked, this, &ComicViewerWidget::randomRequested);
     connect(next, &QPushButton::clicked, this, &ComicViewerWidget::nextRequested);
+    connect(edit, &QPushButton::clicked, tags, &ComicTagsWidget::openEditDialog);
 
-    auto* nav = new QHBoxLayout;
+    nav = new QHBoxLayout;
     nav->addWidget(prev);
     nav->addWidget(rand);
     nav->addWidget(next);
+    nav->addWidget(edit);
 
     auto* layout = new QVBoxLayout(this);
-
     layout->addWidget(title);
     layout->addWidget(image, 1);
     layout->addWidget(tags, 0, Qt::AlignBottom);
@@ -50,7 +49,9 @@ void ComicViewerWidget::showComic(const QDate& date, const QPixmap& pixmap) {
 }
 
 void ComicViewerWidget::resizeEvent(QResizeEvent*) {
-    if (!current.isNull())
-        image->setPixmap(
-            current.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    if (current.isNull()) return;
+
+    image->setPixmap(current.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
+
+void ComicViewerWidget::addButton(QPushButton* newBtn) { nav->addWidget(newBtn); }
