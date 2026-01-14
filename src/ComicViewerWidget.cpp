@@ -1,7 +1,5 @@
 #include "ComicViewerWidget.h"
 
-#include <qpushbutton.h>
-
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QPushButton>

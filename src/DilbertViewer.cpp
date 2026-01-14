@@ -1,7 +1,5 @@
 #include "DilbertViewer.h"
 
-#include <qnamespace.h>
-
 #include <QFile>
 #include <QGuiApplication>
 #include <QKeyEvent>
@@ -28,10 +26,10 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
     setCentralWidget(tabs);
 
     connect(viewer, &ComicViewerWidget::previousRequested, this,
-            [this] { loadComic(currentDate.addDays(-1)); });
+            [this] { loadComic(currentComicDate.addDays(-1)); });
 
     connect(viewer, &ComicViewerWidget::nextRequested, this,
-            [this] { loadComic(currentDate.addDays(1)); });
+            [this] { loadComic(currentComicDate.addDays(1)); });
 
     connect(viewer, &ComicViewerWidget::randomRequested, this, [this] { loadComic(randomDate()); });
 
@@ -47,8 +45,20 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
     connect(tags, &ComicTagsWidget::tagEdited, this,
             [this](const QString& oldTag, const QString& newTag) {
                 repo.editTag(oldTag, newTag);
-                tags->setTags(repo.tagsForComic(currentDate));
+                tags->setTags(repo.tagsForComic(currentComicDate));
             });
+
+    connect(tags, &ComicTagsWidget::tagRemoved, this,
+        [this](const QString& tag) {
+            repo.removeTagFromComic(currentComicDate, tag);
+            tags->setTags(repo.tagsForComic(currentComicDate));
+        });
+
+    connect(tags, &ComicTagsWidget::tagAdded, this,
+        [this](const QString& tag) {
+            repo.addTagToComic(currentComicDate, tag);
+            tags->setTags(repo.tagsForComic(currentComicDate));
+        });
 
     connect(search, &ComicSearchWidget::searchRequested, this,
             [this, tabs](const QString& q, ComicSearchWidget::Mode m) {
@@ -86,9 +96,9 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
 
 void DilbertViewer::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_N) {
-        loadComic(currentDate.addDays(1));
+        loadComic(currentComicDate.addDays(1));
     } else if (event->key() == Qt::Key_P) {
-        loadComic(currentDate.addDays(-1));
+        loadComic(currentComicDate.addDays(-1));
     } else if (event->key() == Qt::Key_R) {
         loadComic(randomDate());
     } else if (event->key() == Qt::Key_E) {
@@ -112,7 +122,7 @@ void DilbertViewer::loadComic(const QDate& date) {
     if (!QFile::exists(path)) return;
 
     QPixmap pix(path);
-    currentDate = date;
+    currentComicDate = date;
 
     viewer->showComic(date, pix);
     tags->setTags(repo.tagsForComic(date));

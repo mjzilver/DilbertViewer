@@ -24,7 +24,7 @@ private:
     ComicSearchWidget* search;
     ComicTagsWidget* tags;
 
-    QDate currentDate;
+    QDate currentComicDate;
     const QDate first{1989, 4, 16};
     const QDate last{2023, 3, 12};
 };

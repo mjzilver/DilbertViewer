@@ -1,6 +1,4 @@
 #pragma once
-#include <qpixmap.h>
-#include <qpushbutton.h>
 
 #include <QDate>
 #include <QHBoxLayout>

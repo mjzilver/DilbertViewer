@@ -1,7 +1,5 @@
 #include "ComicRepository.h"
 
-#include <qsqlquery.h>
-
 #include <QDebug>
 #include <QtSql>
 
@@ -148,5 +146,56 @@ void ComicRepository::editTag(const QString& oldTag, const QString& newTag) {
         if (!updateQuery.exec()) {
             qDebug() << "Failed to update tag name:" << updateQuery.lastError().text();
         }
+    }
+}
+
+void ComicRepository::addTagToComic(const QDate& date, const QString& tagName) {
+    QSqlQuery q(db);
+
+    q.prepare("SELECT id FROM tags WHERE name = :name");
+    q.bindValue(":name", tagName);
+    q.exec();
+
+    int tagId;
+    if (q.next()) {
+        tagId = q.value(0).toInt();
+    } else {
+        QSqlQuery insertTag(db);
+        insertTag.prepare("INSERT INTO tags(name) VALUES(:name)");
+        insertTag.bindValue(":name", tagName);
+        if (!insertTag.exec()) return;
+        tagId = insertTag.lastInsertId().toInt();
+    }
+
+    QSqlQuery link(db);
+    link.prepare("INSERT OR IGNORE INTO comic_tags(comic_date, tag_id) VALUES(:date, :tagId)");
+    link.bindValue(":date", date.toString(Qt::ISODate));
+    link.bindValue(":tagId", tagId);
+    link.exec();
+}
+
+void ComicRepository::removeTagFromComic(const QDate& date, const QString& tagName) {
+    QSqlQuery q(db);
+    q.prepare("SELECT id FROM tags WHERE name = :name");
+    q.bindValue(":name", tagName);
+    if (!q.exec() || !q.next()) return;
+
+    int tagId = q.value(0).toInt();
+
+    QSqlQuery del(db);
+    del.prepare("DELETE FROM comic_tags WHERE comic_date = :date AND tag_id = :tagId");
+    del.bindValue(":date", date.toString(Qt::ISODate));
+    del.bindValue(":tagId", tagId);
+    del.exec();
+
+    QSqlQuery check(db);
+    check.prepare("SELECT COUNT(*) FROM comic_tags WHERE tag_id = :tagId");
+    check.bindValue(":tagId", tagId);
+    check.exec();
+    if (check.next() && check.value(0).toInt() == 0) {
+        QSqlQuery deleteTag(db);
+        deleteTag.prepare("DELETE FROM tags WHERE id = :tagId");
+        deleteTag.bindValue(":tagId", tagId);
+        deleteTag.exec();
     }
 }

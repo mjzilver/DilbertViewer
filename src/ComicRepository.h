@@ -16,6 +16,9 @@ public:
     QList<ComicItem> comicsForDate(const QString& date) const;
     QList<ComicItem> comicsForTranscript(const QString& text) const;
 
+    void removeTagFromComic(const QDate& date, const QString& tagName);
+    void addTagToComic(const QDate& date, const QString& tagName);
+
     void editTag(const QString& oldTag, const QString& newTag);
 
 private:

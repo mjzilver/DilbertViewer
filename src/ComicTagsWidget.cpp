@@ -6,6 +6,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include "ComicTagsEditorDialog.h"
 
 ComicTagsWidget::ComicTagsWidget(QWidget* parent) : QWidget(parent) {
     layout = new FlowLayout(this, 0, 6, 6);
@@ -34,7 +35,13 @@ void ComicTagsWidget::setTags(const QStringList& newTags) {
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     layout->addWidget(spacer);
 
-    // viewer->addButton(createButton("Edit tags", false, [this, tags] { openEditDialog(tags); }));
+    if(editor && editor->isVisible()) {
+        editor->close();
+        editor->deleteLater();
+        editor = nullptr;
+        
+        openEditDialog();
+    }
 }
 
 QWidget* ComicTagsWidget::createLabel(const QString& text, const QColor& color) {
@@ -52,29 +59,11 @@ QPushButton* ComicTagsWidget::createButton(const QString& text, bool flat,
 }
 
 void ComicTagsWidget::openEditDialog() {
-    QDialog* dialog = new QDialog(this);
-    dialog->setWindowTitle("Edit Tags");
-    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    editor = new ComicTagsEditorDialog(tags, this);
 
-    for (const QString& tag : tags) {
-        QHBoxLayout* rowLayout = new QHBoxLayout;
-        QLineEdit* lineEdit = new QLineEdit(tag);
-        QPushButton* saveBtn = new QPushButton("Save");
+    connect(editor, &ComicTagsEditorDialog::tagEdited, this, &ComicTagsWidget::tagEdited);
+    connect(editor, &ComicTagsEditorDialog::tagRemoved, this, &ComicTagsWidget::tagRemoved);
+    connect(editor, &ComicTagsEditorDialog::tagAdded, this, &ComicTagsWidget::tagAdded);
 
-        rowLayout->addWidget(lineEdit);
-        rowLayout->addWidget(saveBtn);
-
-        connect(saveBtn, &QPushButton::clicked, this,
-                [this, lineEdit, tag]() { emit tagEdited(tag, lineEdit->text()); });
-
-        layout->addLayout(rowLayout);
-    }
-
-    QPushButton* closeBtn = new QPushButton("Close");
-    connect(closeBtn, &QPushButton::clicked, dialog, &QDialog::accept);
-    layout->addWidget(closeBtn);
-
-    dialog->setLayout(layout);
-    dialog->setModal(false);
-    dialog->show();
+    editor->show();
 }
