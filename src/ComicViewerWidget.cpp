@@ -5,14 +5,15 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QVBoxLayout>
+
 #include "ComicTagsWidget.h"
 
-ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : QWidget(parent) {
+ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags)
+    : QWidget(parent), image(new QLabel), nav(new QHBoxLayout) {
     title = new QLabel("No comic");
     title->setAlignment(Qt::AlignCenter);
     title->setFont(QFont("Arial", 24, QFont::Bold));
 
-    image = new QLabel;
     image->setAlignment(Qt::AlignCenter);
     image->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Ignored);
     image->setMinimumSize(400, 200);
@@ -27,7 +28,6 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags) : Q
     connect(next, &QPushButton::clicked, this, &ComicViewerWidget::nextRequested);
     connect(edit, &QPushButton::clicked, tags, &ComicTagsWidget::openEditDialog);
 
-    nav = new QHBoxLayout;
     nav->addWidget(prev);
     nav->addWidget(rand);
     nav->addWidget(next);

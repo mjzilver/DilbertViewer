@@ -9,18 +9,16 @@
 #include <QPixmap>
 #include <QVBoxLayout>
 
-ComicSearchWidget::ComicSearchWidget(const QStringList& tags, QWidget* parent) : QWidget(parent) {
-    modeBox = new QComboBox;
+ComicSearchWidget::ComicSearchWidget(const QStringList& tags, QWidget* parent)
+    : QWidget(parent), modeBox(new QComboBox), edit(new QLineEdit), gallery(new QListWidget) {
     modeBox->addItems({"Tag", "Date", "Transcript"});
 
-    edit = new QLineEdit;
     edit->setCompleter(new QCompleter(tags, this));
 
     auto* bar = new QHBoxLayout;
     bar->addWidget(modeBox);
     bar->addWidget(edit);
 
-    gallery = new QListWidget;
     gallery->setViewMode(QListView::IconMode);
     gallery->setIconSize({150, 150});
     gallery->setSpacing(10);

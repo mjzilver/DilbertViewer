@@ -1,0 +1,27 @@
+Checks: >
+  readability-identifier-naming,
+  misc-unused-parameters,
+  clang-diagnostic-unused-variable,
+  clang-diagnostic-unused-parameter,
+  clang-diagnostic-unused-private-field
+  llvm-include-cleaner,
+  readability-make-member-function-const,
+  cppcoreguidelines-avoid-non-const-global-variables,
+  performance-unnecessary-value-param,
+  performance-unnecessary-copy-initialization,
+  readability-qualified-auto,
+  cppcoreguidelines-avoid-mutable,
+  cppcoreguidelines-prefer-member-initializer,
+  qt-*
+
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.MemberCase
+    value: camelBack
+  - key: readability-identifier-naming.StaticConstantCase
+    value: UPPER_CASE

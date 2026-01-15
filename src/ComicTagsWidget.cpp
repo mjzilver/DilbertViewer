@@ -6,10 +6,11 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
+
 #include "ComicTagsEditorDialog.h"
 
-ComicTagsWidget::ComicTagsWidget(QWidget* parent) : QWidget(parent) {
-    layout = new FlowLayout(this, 0, 6, 6);
+ComicTagsWidget::ComicTagsWidget(QWidget* parent)
+    : QWidget(parent), layout(new FlowLayout(this, 0, 6, 6)) {
     setLayout(layout);
 }
 
@@ -35,11 +36,11 @@ void ComicTagsWidget::setTags(const QStringList& newTags) {
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     layout->addWidget(spacer);
 
-    if(editor && editor->isVisible()) {
+    if (editor && editor->isVisible()) {
         editor->close();
         editor->deleteLater();
         editor = nullptr;
-        
+
         openEditDialog();
     }
 }
@@ -51,7 +52,7 @@ QWidget* ComicTagsWidget::createLabel(const QString& text, const QColor& color) 
 }
 
 QPushButton* ComicTagsWidget::createButton(const QString& text, bool flat,
-                                           std::function<void()> onClick) {
+                                           const std::function<void()>& onClick) {
     auto* btn = new QPushButton(text);
     btn->setFlat(flat);
     connect(btn, &QPushButton::clicked, this, onClick);

@@ -1,11 +1,10 @@
 #include "ComicTagsEditorDialog.h"
 
-#include <QVBoxLayout>
 #include <QLineEdit>
+#include <QVBoxLayout>
 
 ComicTagsEditorDialog::ComicTagsEditorDialog(const QStringList& tags, QWidget* parent)
-    : QDialog(parent), currentTags(tags)
-{
+    : QDialog(parent), currentTags(tags) {
     setWindowTitle("Edit Tags");
     QVBoxLayout* layout = new QVBoxLayout(this);
 
@@ -19,13 +18,10 @@ ComicTagsEditorDialog::ComicTagsEditorDialog(const QStringList& tags, QWidget* p
         rowLayout->addWidget(saveBtn);
         rowLayout->addWidget(removeBtn);
 
-        connect(saveBtn, &QPushButton::clicked, this, [this, tag, lineEdit]() {
-            emit tagEdited(tag, lineEdit->text());
-        });
+        connect(saveBtn, &QPushButton::clicked, this,
+                [this, tag, lineEdit]() { emit tagEdited(tag, lineEdit->text()); });
 
-        connect(removeBtn, &QPushButton::clicked, this, [this, tag]() {
-            emit tagRemoved(tag);
-        });
+        connect(removeBtn, &QPushButton::clicked, this, [this, tag]() { emit tagRemoved(tag); });
 
         layout->addLayout(rowLayout);
     }

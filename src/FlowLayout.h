@@ -1,14 +1,13 @@
 // Copyright (C) 2016 The Qt Company Ltd.
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
 
-#ifndef FLOWLAYOUT_H
-#define FLOWLAYOUT_H
+#pragma once
 
 #include <QLayout>
 #include <QRect>
 #include <QStyle>
 
-class FlowLayout : public QLayout {
+class FlowLayout final : public QLayout {
 public:
     explicit FlowLayout(QWidget *parent, int margin = -1, int hSpacing = -1, int vSpacing = -1);
     explicit FlowLayout(int margin = -1, int hSpacing = -1, int vSpacing = -1);
@@ -26,14 +25,12 @@ public:
     void setGeometry(const QRect &rect) override;
     QSize sizeHint() const override;
     QLayoutItem *takeAt(int index) override;
-    
+
 private:
     int doLayout(const QRect &rect, bool testOnly) const;
     int smartSpacing(QStyle::PixelMetric pm) const;
 
     QList<QLayoutItem *> itemList;
-    int m_hSpace;
-    int m_vSpace;
+    int hSpace;
+    int vSpace;
 };
-
-#endif  // FLOWLAYOUT_H

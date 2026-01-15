@@ -13,10 +13,10 @@
 #include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
 
-DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dilbert/metadata.db") {
+DilbertViewer::DilbertViewer(QWidget* parent)
+    : QMainWindow(parent), repo("./Dilbert/metadata.db"), tags(new ComicTagsWidget(this)) {
     auto* tabs = new QTabWidget(this);
 
-    tags = new ComicTagsWidget(this);
     viewer = new ComicViewerWidget(this, tags);
     search = new ComicSearchWidget(repo.allTags(), this);
 
@@ -48,17 +48,15 @@ DilbertViewer::DilbertViewer(QWidget* parent) : QMainWindow(parent), repo("./Dil
                 tags->setTags(repo.tagsForComic(currentComicDate));
             });
 
-    connect(tags, &ComicTagsWidget::tagRemoved, this,
-        [this](const QString& tag) {
-            repo.removeTagFromComic(currentComicDate, tag);
-            tags->setTags(repo.tagsForComic(currentComicDate));
-        });
+    connect(tags, &ComicTagsWidget::tagRemoved, this, [this](const QString& tag) {
+        repo.removeTagFromComic(currentComicDate, tag);
+        tags->setTags(repo.tagsForComic(currentComicDate));
+    });
 
-    connect(tags, &ComicTagsWidget::tagAdded, this,
-        [this](const QString& tag) {
-            repo.addTagToComic(currentComicDate, tag);
-            tags->setTags(repo.tagsForComic(currentComicDate));
-        });
+    connect(tags, &ComicTagsWidget::tagAdded, this, [this](const QString& tag) {
+        repo.addTagToComic(currentComicDate, tag);
+        tags->setTags(repo.tagsForComic(currentComicDate));
+    });
 
     connect(search, &ComicSearchWidget::searchRequested, this,
             [this, tabs](const QString& q, ComicSearchWidget::Mode m) {

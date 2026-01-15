@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QObject>
 #include <QDialog>
+#include <QObject>
 #include <QPushButton>
 #include <QStringList>
 #include <QWidget>

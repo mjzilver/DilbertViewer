@@ -30,5 +30,5 @@ private:
     ComicTagsEditorDialog* editor;
 
     QWidget* createLabel(const QString& text, const QColor& color = Qt::black);
-    QPushButton* createButton(const QString& text, bool flat, std::function<void()> onClick);
+    QPushButton* createButton(const QString& text, bool flat, const std::function<void()>& onClick);
 };

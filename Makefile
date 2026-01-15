@@ -7,7 +7,7 @@ H_FILES := $(shell find $(SRC_DIR) -name "*.h")
 
 MAKE_FLAGS := -j$(shell nproc --ignore=1)
 
-.PHONY: all build build-debug run debug valgrind clean format release
+.PHONY: all build build-debug run debug valgrind clean format tidy release
 
 all: run
 
@@ -34,3 +34,6 @@ clean:
 
 format:
 	clang-format -i $(CPP_FILES) $(H_FILES)
+
+tidy: $(BUILD_DIR)/Makefile
+	clang-tidy -p $(BUILD_DIR) $(CPP_FILES) $(H_FILES)

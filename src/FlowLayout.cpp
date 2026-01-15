@@ -6,12 +6,12 @@
 #include <QtWidgets>
 
 FlowLayout::FlowLayout(QWidget *parent, int margin, int hSpacing, int vSpacing)
-    : QLayout(parent), m_hSpace(hSpacing), m_vSpace(vSpacing) {
+    : QLayout(parent), hSpace(hSpacing), vSpace(vSpacing) {
     setContentsMargins(margin, margin, margin, margin);
 }
 
 FlowLayout::FlowLayout(int margin, int hSpacing, int vSpacing)
-    : m_hSpace(hSpacing), m_vSpace(vSpacing) {
+    : hSpace(hSpacing), vSpace(vSpacing) {
     setContentsMargins(margin, margin, margin, margin);
 }
 
@@ -23,16 +23,16 @@ FlowLayout::~FlowLayout() {
 void FlowLayout::addItem(QLayoutItem *item) { itemList.append(item); }
 
 int FlowLayout::horizontalSpacing() const {
-    if (m_hSpace >= 0) {
-        return m_hSpace;
+    if (hSpace >= 0) {
+        return hSpace;
     } else {
         return smartSpacing(QStyle::PM_LayoutHorizontalSpacing);
     }
 }
 
 int FlowLayout::verticalSpacing() const {
-    if (m_vSpace >= 0) {
-        return m_vSpace;
+    if (vSpace >= 0) {
+        return vSpace;
     } else {
         return smartSpacing(QStyle::PM_LayoutVerticalSpacing);
     }
