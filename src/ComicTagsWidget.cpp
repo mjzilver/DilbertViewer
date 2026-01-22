@@ -10,7 +10,7 @@
 #include "ComicTagsEditorDialog.h"
 
 ComicTagsWidget::ComicTagsWidget(QWidget* parent)
-    : QWidget(parent), layout(new FlowLayout(this, 0, 6, 6)) {
+    : QWidget(parent), editor(nullptr), layout(new FlowLayout(this, 0, 6, 6)) {
     setLayout(layout);
 }
 
