@@ -101,6 +101,8 @@ void DilbertViewer::keyPressEvent(QKeyEvent* event) {
         loadComic(randomDate());
     } else if (event->key() == Qt::Key_E) {
         tags->openEditDialog();
+    } else if (event->modifiers() == Qt::ControlModifier && event->key() == Qt::Key_C) {
+        viewer->copyImageToClipboard();
     }
 }
 

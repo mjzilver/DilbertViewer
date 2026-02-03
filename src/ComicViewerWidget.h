@@ -17,6 +17,9 @@ public:
     void showComic(const QDate& date, const QPixmap& pixmap);
     void addButton(QPushButton* newBtn);
 
+public slots:
+    void copyImageToClipboard();
+
 signals:
     void previousRequested();
     void nextRequested();
@@ -26,8 +29,8 @@ protected:
     void resizeEvent(QResizeEvent*) override;
 
 private:
-    QLabel* title;
-    QLabel* image;
-    QPixmap current;
+    QLabel* titleLabel;
+    QLabel* imageLabel;
+    QPixmap currentPixmap;
     QHBoxLayout* nav;
 };

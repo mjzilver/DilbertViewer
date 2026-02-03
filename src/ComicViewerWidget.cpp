@@ -1,22 +1,25 @@
 #include "ComicViewerWidget.h"
 
+#include <QApplication>
+#include <QClipboard>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QScreen>
+#include <QToolTip>
 #include <QVBoxLayout>
 
 #include "ComicTagsWidget.h"
 
 ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags)
-    : QWidget(parent), image(new QLabel), nav(new QHBoxLayout) {
-    title = new QLabel("No comic");
-    title->setAlignment(Qt::AlignCenter);
-    title->setFont(QFont("Arial", 24, QFont::Bold));
+    : QWidget(parent), imageLabel(new QLabel), nav(new QHBoxLayout) {
+    titleLabel = new QLabel("No comic");
+    titleLabel->setAlignment(Qt::AlignCenter);
+    titleLabel->setFont(QFont("Arial", 24, QFont::Bold));
 
-    image->setAlignment(Qt::AlignCenter);
-    image->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Ignored);
-    image->setMinimumSize(400, 200);
+    imageLabel->setAlignment(Qt::AlignCenter);
+    imageLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Ignored);
+    imageLabel->setMinimumSize(400, 200);
 
     auto* prev = new QPushButton("Previous");
     auto* rand = new QPushButton("Random");
@@ -34,22 +37,42 @@ ComicViewerWidget::ComicViewerWidget(QWidget* parent, ComicTagsWidget* tags)
     nav->addWidget(edit);
 
     auto* layout = new QVBoxLayout(this);
-    layout->addWidget(title);
-    layout->addWidget(image, 1);
+    layout->addWidget(titleLabel);
+    layout->addWidget(imageLabel, 1);
     layout->addWidget(tags, 0, Qt::AlignBottom);
     layout->addLayout(nav);
 }
 
 void ComicViewerWidget::showComic(const QDate& date, const QPixmap& pixmap) {
-    current = pixmap;
-    title->setText("Dilbert: " + date.toString(Qt::ISODate));
-    image->setPixmap(current.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    currentPixmap = pixmap;
+    titleLabel->setText("Dilbert: " + date.toString(Qt::ISODate));
+    imageLabel->setPixmap(
+        currentPixmap.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
 
 void ComicViewerWidget::resizeEvent(QResizeEvent*) {
-    if (current.isNull()) return;
+    if (currentPixmap.isNull()) return;
 
-    image->setPixmap(current.scaled(image->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    imageLabel->setPixmap(
+        currentPixmap.scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
 
 void ComicViewerWidget::addButton(QPushButton* newBtn) { nav->addWidget(newBtn); }
+
+void ComicViewerWidget::copyImageToClipboard() {
+    if (currentPixmap.isNull()) return;
+
+    QApplication::clipboard()->setPixmap(currentPixmap);
+
+    QString text = "Image copied to clipboard";
+
+    QPoint centerGlobal = imageLabel->mapToGlobal(imageLabel->rect().center());
+
+    QFontMetrics fm(QToolTip::font());
+    QRect textRect = fm.boundingRect(text);
+    QSize size = textRect.size();
+
+    QPoint topLeft = centerGlobal - QPoint(size.width() / 2, size.height() / 2);
+
+    QToolTip::showText(topLeft, text, imageLabel);
+}
