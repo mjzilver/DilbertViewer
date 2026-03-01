@@ -2,26 +2,43 @@
 
 #include <QFile>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QPixmap>
 #include <QRandomGenerator>
 #include <QScreen>
+#include <QSettings>
 #include <QSize>
 #include <QSizePolicy>
 #include <QTabWidget>
 
 #include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
+#include "SettingsWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent)
-    : QMainWindow(parent), repo("./Dilbert/metadata.db"), tags(new ComicTagsWidget(this)) {
+    : QMainWindow(parent), repo(nullptr), tags(new ComicTagsWidget(this)) {
     auto* tabs = new QTabWidget(this);
 
+    setWindowTitle("Dilbert Viewer");
+
+    QSettings s("DilbertViewer", "DilbertViewer");
+    dbPath = s.value("dbPath", "./Dilbert/metadata.db").toString();
+    dilbertDir = s.value("dilbertDir", "./Dilbert").toString();
+
+    repo = new ComicRepository(dbPath);
+
     viewer = new ComicViewerWidget(this, tags);
-    search = new ComicSearchWidget(repo.allTags(), this);
+    search = new ComicSearchWidget(repo->allTags(), this);
 
     tabs->addTab(viewer, "Viewer");
     tabs->addTab(search, "Search");
+
+    auto* settingsWidget = new SettingsWidget(this);
+    settingsWidget->setValues(dbPath, dilbertDir);
+    tabs->addTab(settingsWidget, "Settings");
+    connect(settingsWidget, &SettingsWidget::settingsChanged, this,
+            &DilbertViewer::onSettingsChanged);
 
     setCentralWidget(tabs);
 
@@ -34,8 +51,8 @@ DilbertViewer::DilbertViewer(QWidget* parent)
     connect(viewer, &ComicViewerWidget::randomRequested, this, [this] { loadComic(randomDate()); });
 
     connect(tags, &ComicTagsWidget::tagSelected, this, [this, tabs](const QString& tag) {
-        auto comics = repo.comicsForTag(tag);
-        for (ComicItem& c : comics) c.path = "./Dilbert/" + c.path;
+        auto comics = repo->comicsForTag(tag);
+        for (ComicItem& c : comics) c.path = dilbertDir + "/" + c.path;
 
         search->showResults(comics);
         search->setInput(tag);
@@ -44,18 +61,18 @@ DilbertViewer::DilbertViewer(QWidget* parent)
 
     connect(tags, &ComicTagsWidget::tagEdited, this,
             [this](const QString& oldTag, const QString& newTag) {
-                repo.editTag(oldTag, newTag);
-                tags->setTags(repo.tagsForComic(currentComicDate));
+                repo->editTag(oldTag, newTag);
+                tags->setTags(repo->tagsForComic(currentComicDate));
             });
 
     connect(tags, &ComicTagsWidget::tagRemoved, this, [this](const QString& tag) {
-        repo.removeTagFromComic(currentComicDate, tag);
-        tags->setTags(repo.tagsForComic(currentComicDate));
+        repo->removeTagFromComic(currentComicDate, tag);
+        tags->setTags(repo->tagsForComic(currentComicDate));
     });
 
     connect(tags, &ComicTagsWidget::tagAdded, this, [this](const QString& tag) {
-        repo.addTagToComic(currentComicDate, tag);
-        tags->setTags(repo.tagsForComic(currentComicDate));
+        repo->addTagToComic(currentComicDate, tag);
+        tags->setTags(repo->tagsForComic(currentComicDate));
     });
 
     connect(search, &ComicSearchWidget::searchRequested, this,
@@ -64,19 +81,19 @@ DilbertViewer::DilbertViewer(QWidget* parent)
 
                 switch (m) {
                     case ComicSearchWidget::Tag:
-                        comics = repo.comicsForTag(q);
+                        comics = repo->comicsForTag(q);
                         break;
 
                     case ComicSearchWidget::Date:
-                        comics = repo.comicsForDate(q);
+                        comics = repo->comicsForDate(q);
                         break;
 
                     case ComicSearchWidget::Transcript:
-                        comics = repo.comicsForTranscript(q);
+                        comics = repo->comicsForTranscript(q);
                         break;
                 }
 
-                for (ComicItem& c : comics) c.path = "./Dilbert/" + c.path;
+                for (ComicItem& c : comics) c.path = dilbertDir + "/" + c.path;
 
                 search->showResults(comics);
                 tabs->setCurrentIndex(1);
@@ -111,10 +128,26 @@ QDate DilbertViewer::randomDate() const {
 }
 
 QString DilbertViewer::comicPath(const QDate& d) const {
-    return QString("./Dilbert/%1/Dilbert_%1-%2-%3.png")
+    return QString("%1/%2/Dilbert_%2-%3-%4.png")
+        .arg(dilbertDir)
         .arg(d.year(), 4, 10, QChar('0'))
         .arg(d.month(), 2, 10, QChar('0'))
         .arg(d.day(), 2, 10, QChar('0'));
+}
+
+void DilbertViewer::onSettingsChanged(const QString& newDbPath, const QString& newDilbertDir) {
+    dbPath = newDbPath;
+    dilbertDir = newDilbertDir;
+
+    QSettings s("DilbertViewer", "DilbertViewer");
+    s.setValue("dbPath", dbPath);
+    s.setValue("dilbertDir", dilbertDir);
+
+    delete repo;
+    repo = new ComicRepository(dbPath);
+
+    search->setTags(repo->allTags());
+    tags->setTags(repo->tagsForComic(currentComicDate));
 }
 
 void DilbertViewer::loadComic(const QDate& date) {
@@ -125,5 +158,5 @@ void DilbertViewer::loadComic(const QDate& date) {
     currentComicDate = date;
 
     viewer->showComic(date, pix);
-    tags->setTags(repo.tagsForComic(date));
+    tags->setTags(repo->tagsForComic(date));
 }

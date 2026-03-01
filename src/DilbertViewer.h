@@ -19,10 +19,15 @@ private:
     QDate randomDate() const;
     QString comicPath(const QDate& date) const;
 
-    ComicRepository repo;
+    ComicRepository* repo;
     ComicViewerWidget* viewer;
     ComicSearchWidget* search;
     ComicTagsWidget* tags;
+
+    QString dbPath;
+    QString dilbertDir;
+
+    void onSettingsChanged(const QString& dbPath, const QString& dilbertDir);
 
     QDate currentComicDate;
     const QDate first{1989, 4, 16};

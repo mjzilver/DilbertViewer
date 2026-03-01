@@ -35,6 +35,10 @@ void ComicSearchWidget::onReturnPressed() {
     emit searchRequested(edit->text().trimmed(), static_cast<Mode>(modeBox->currentIndex()));
 }
 
+void ComicSearchWidget::setTags(const QStringList& tags) {
+    edit->setCompleter(new QCompleter(tags, this));
+}
+
 void ComicSearchWidget::showResults(const QList<ComicItem>& comics) {
     gallery->clear();
     pending.clear();

@@ -19,6 +19,7 @@ public:
 
     void showResults(const QList<ComicItem>& comics);
     void setInput(const QString& str);
+    void setTags(const QStringList& tags);
 
 signals:
     void searchRequested(const QString& query, Mode mode);

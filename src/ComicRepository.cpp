@@ -7,7 +7,7 @@ ComicRepository::ComicRepository(const QString& dbPath) {
     db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbPath);
 
-    if (!db.open()) qFatal("Failed to open database");
+    if (!db.open()) qWarning() << "Failed to open database:" << db.lastError().text();
 }
 
 ComicRepository::~ComicRepository() {
