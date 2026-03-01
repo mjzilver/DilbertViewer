@@ -37,7 +37,12 @@ debug: build-debug
 	gdb ./$(BUILD_DIR)/$(EXEC)
 
 valgrind: build-debug
-	valgrind --leak-check=full ./$(BUILD_DIR)/$(EXEC)
+	valgrind --leak-check=full \
+		--show-leak-kinds=all \
+		--track-origins=yes \
+		--verbose \
+		--log-file=$(BUILD_DIR)/valgrind.log \
+		./$(BUILD_DIR)/$(EXEC)
 
 clean:
 	rm -rf $(BUILD_DIR)

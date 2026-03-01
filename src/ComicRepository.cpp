@@ -2,9 +2,11 @@
 
 #include <QDebug>
 #include <QtSql>
+#include <QUuid>
 
 ComicRepository::ComicRepository(const QString& dbPath) {
-    db = QSqlDatabase::addDatabase("QSQLITE");
+    connectionName = "ComicRepo_" + QUuid::createUuid().toString();
+    db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
     db.setDatabaseName(dbPath);
 
     if (!db.open()) qWarning() << "Failed to open database:" << db.lastError().text();
@@ -12,6 +14,9 @@ ComicRepository::ComicRepository(const QString& dbPath) {
 
 ComicRepository::~ComicRepository() {
     if (db.isOpen()) db.close();
+
+    db = QSqlDatabase();
+    QSqlDatabase::removeDatabase(connectionName);
 }
 
 QStringList ComicRepository::allTags() const {

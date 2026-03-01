@@ -23,4 +23,5 @@ public:
 
 private:
     QSqlDatabase db;
+    QString connectionName;
 };
