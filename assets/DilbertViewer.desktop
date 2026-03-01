@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dilbert Viewer
+Comment=View Dilbert comics
+Exec=/usr/local/bin/DilbertViewer
+Icon=dilbert
+Terminal=false
+Categories=Graphics;Viewer;

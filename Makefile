@@ -1,16 +1,23 @@
 EXEC := DilbertViewer
 BUILD_DIR := out
 SRC_DIR := src
+ASSETS_DIR := assets
 
 CPP_FILES := $(shell find $(SRC_DIR) -name "*.cpp")
 H_FILES := $(shell find $(SRC_DIR) -name "*.h")
 
 MAKE_FLAGS := -j$(shell nproc --ignore=1)
 
-.PHONY: all build build-debug run debug valgrind clean format tidy release install uninstall
-
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
+DATADIR = $(PREFIX)/share
+APPDIR = $(DATADIR)/applications
+ICONDIR = $(DATADIR)/icons/hicolor/256x256/apps
+
+DESKTOP_FILE = $(ASSETS_DIR)/$(EXEC).desktop
+ICON_FILE = $(ASSETS_DIR)/dilbert.png
+
+.PHONY: all build build-debug run debug valgrind clean format tidy release install uninstall
 
 all: run
 
@@ -42,9 +49,15 @@ tidy: $(BUILD_DIR)/Makefile
 	clang-tidy -p $(BUILD_DIR) $(CPP_FILES) $(H_FILES)
 
 install: build
-	install -d $(DESTDIR)$(BINDIR)
 	install -m 755 $(BUILD_DIR)/$(EXEC) $(DESTDIR)$(BINDIR)
+
+	install -d $(DESTDIR)$(APPDIR)
+	install -m 644 $(DESKTOP_FILE) $(DESTDIR)$(APPDIR)
+
+	install -d $(DESTDIR)$(ICONDIR)
+	install -m 644 $(ICON_FILE) $(DESTDIR)$(ICONDIR)
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(EXEC)
-		
+	rm -f $(DESTDIR)$(APPDIR)/$(EXEC).desktop
+	rm -f $(DESTDIR)$(ICONDIR)/dilbert.png
