@@ -1,9 +1,8 @@
 #pragma once
 
+#include <QLineEdit>
+#include <QPushButton>
 #include <QWidget>
-
-class QLineEdit;
-class QPushButton;
 
 class SettingsWidget : public QWidget {
     Q_OBJECT

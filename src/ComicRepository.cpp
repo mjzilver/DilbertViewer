@@ -1,8 +1,8 @@
 #include "ComicRepository.h"
 
 #include <QDebug>
-#include <QtSql>
 #include <QUuid>
+#include <QtSql>
 
 ComicRepository::ComicRepository(const QString& dbPath) {
     connectionName = "ComicRepo_" + QUuid::createUuid().toString();

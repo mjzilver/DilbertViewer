@@ -1,6 +1,5 @@
-ENTRY := downloader.py
+SRC_DIR := src
 VENV_DIR := venv
-REQS := requirements.txt
 PYTHON := python3
 PIP := $(VENV_DIR)/bin/pip
 PY := $(VENV_DIR)/bin/python
@@ -13,11 +12,11 @@ $(VENV_DIR):
 	$(PYTHON) -m venv $(VENV_DIR) && $(PIP) install -U pip
 
 install: $(VENV_DIR)
-	$(PIP) install -r $(REQS)
+	$(PIP) install -e ".[dev]"
 
-run: $(VENV_DIR) install
-	$(PY) $(ENTRY)
-	
+run: install
+	$(PY) -m downloader
+
 format: $(VENV_DIR)
 	$(VENV_DIR)/bin/black . --exclude "$(VENV_DIR)"
 
