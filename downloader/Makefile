@@ -10,8 +10,7 @@ PY := $(VENV_DIR)/bin/python
 all: install run
 
 $(VENV_DIR):
-	$(PYTHON) -m venv $(VENV_DIR)
-	$(PIP) install -U pip
+	$(PYTHON) -m venv $(VENV_DIR) && $(PIP) install -U pip
 
 install: $(VENV_DIR)
 	$(PIP) install -r $(REQS)
