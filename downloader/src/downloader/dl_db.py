@@ -32,12 +32,16 @@ async def create_tables(db):
 
 async def save_comic_with_tags(db, date_str, relative_path, transcript, tags):
     existing_transcript = None
-    async with db.execute("SELECT transcript FROM comics WHERE date=?", (date_str,)) as cur:
+    async with db.execute(
+        "SELECT transcript FROM comics WHERE date=?", (date_str,)
+    ) as cur:
         row = await cur.fetchone()
         if row:
             existing_transcript = row[0]
 
-    final_transcript = transcript if (transcript and transcript.strip()) else existing_transcript
+    final_transcript = (
+        transcript if (transcript and transcript.strip()) else existing_transcript
+    )
 
     await db.execute(
         "INSERT OR REPLACE INTO comics (date, image_path, transcript, metadata_checked) VALUES (?, ?, ?, 1)",

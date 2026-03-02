@@ -29,7 +29,6 @@ async def process_comic(session, db, task, existing_dates):
     year_folder.mkdir(parents=True, exist_ok=True)
     file_path = year_folder / f"Dilbert_{date_str}.png"
 
-    # Consider metadata present if transcript/tags exist or if metadata was checked previously
     metadata_exists = False
     async with db.execute(
         "SELECT image_path, transcript, COALESCE(metadata_checked, 0) FROM comics WHERE date=?",
@@ -83,7 +82,9 @@ async def process_comic(session, db, task, existing_dates):
         if status == 429:
             task.last_error = f"HTTP 429 from {archived_page_url}"
             return False
-        task.last_error = f"Failed to fetch archived page {archived_page_url}: status={status}"
+        task.last_error = (
+            f"Failed to fetch archived page {archived_page_url}: status={status}"
+        )
         return False
 
     soup = BeautifulSoup(html.decode("utf-8", errors="ignore"), "html.parser")

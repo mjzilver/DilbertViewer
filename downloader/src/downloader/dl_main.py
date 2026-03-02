@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import datetime
 from tqdm.asyncio import tqdm
 import aiosqlite
