@@ -39,7 +39,7 @@ async def start_download():
 
         pbar = tqdm(total=len(to_process), desc="Downloading comics")
         async with httpx.AsyncClient(
-            limits=httpx.Limits(max_connections=cfg.concurrency * 2)
+            limits=httpx.Limits(max_connections=cfg.concurrency)
         ) as session:
             workers = [
                 asyncio.create_task(

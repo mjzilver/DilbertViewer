@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import multiprocessing
+
+multiprocessing.set_start_method("spawn", force=True)
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 def main():
     logger.info("Starting Dilbert downloader")
-    asyncio.run(start_download())
+    try:
+        asyncio.run(start_download())
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt")
+        pass   
     logger.info("Downloader finished")
 
 
