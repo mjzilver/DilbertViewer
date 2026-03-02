@@ -7,7 +7,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from .dl_config import BASE_DIR, FIRST_COMIC
+from .dl_config import FIRST_COMIC
 from .dl_utils import fetch
 from .dl_parser import extract_metadata
 from .dl_db import save_comic_with_tags
@@ -22,10 +22,10 @@ class ComicTask:
         self.last_error = None
 
 
-async def process_comic(session, db, task, existing_dates):
+async def process_comic(session, db, task, existing_dates, base_dir: Path):
     date = task.date
     date_str = date.isoformat()
-    year_folder = BASE_DIR / str(date.year)
+    year_folder = base_dir / str(date.year)
     year_folder.mkdir(parents=True, exist_ok=True)
     file_path = year_folder / f"Dilbert_{date_str}.png"
 
@@ -47,7 +47,7 @@ async def process_comic(session, db, task, existing_dates):
             image_exists = False
             if image_path_db:
                 try:
-                    image_exists = (BASE_DIR / image_path_db).exists()
+                    image_exists = (base_dir / image_path_db).exists()
                 except Exception:
                     image_exists = False
 
@@ -95,7 +95,7 @@ async def process_comic(session, db, task, existing_dates):
         relative_path = Path(str(date.year)) / f"Dilbert_{date_str}.png"
         await save_comic_with_tags(db, date_str, relative_path, transcript, tags)
         logger.info(
-            f"Saved metadata/checked for image: {file_path} - Transcript found: {bool(transcript)}, Tags found: {bool(tags)}"
+            f"Saved metadata for image: {file_path} - Transcript found: {bool(transcript)}, Tags found: {bool(tags)}"
         )
 
     if not file_path.exists():
@@ -121,13 +121,14 @@ async def process_comic(session, db, task, existing_dates):
                 if status == 429:
                     task.last_error = f"HTTP 429 when fetching image {img_url}"
                     return False
-
+        if not file_path.exists():
+            logger.warning(f"Unable to find image for {file_path} at {archived_page_url}")
     existing_dates.add(date_str)
     return True
 
 
 async def worker(
-    worker_id, session, db, queue, pbar, existing_dates, BATCH_COMMIT, MAX_RETRIES
+    worker_id, session, db, queue, pbar, existing_dates, base_dir: Path, BATCH_COMMIT, MAX_RETRIES
 ):
     processed_since_commit = 0
     while True:
@@ -136,7 +137,7 @@ async def worker(
             queue.task_done()
             break
         try:
-            success = await process_comic(session, db, task, existing_dates)
+            success = await process_comic(session, db, task, existing_dates, base_dir)
             if not success and task.attempt < MAX_RETRIES:
                 task.attempt += 1
                 await asyncio.sleep((2**task.attempt) + random.random())

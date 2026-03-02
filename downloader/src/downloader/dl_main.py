@@ -5,10 +5,7 @@ import aiosqlite
 import httpx
 
 from .dl_config import (
-    BASE_DIR,
-    CONCURRENCY,
-    BATCH_COMMIT,
-    MAX_RETRIES,
+    build_config,
     FIRST_COMIC,
     LAST_COMIC,
 )
@@ -17,11 +14,12 @@ from .dl_tasks import ComicTask, worker
 
 
 async def start_download():
-    async with aiosqlite.connect(BASE_DIR / "metadata.db") as db:
+    cfg = build_config()
+    async with aiosqlite.connect(cfg.base_dir / "metadata.db") as db:
         await create_tables(db)
         await db.commit()
 
-        existing_dates = await load_existing_dates(db, BASE_DIR)
+        existing_dates = await load_existing_dates(db, cfg.base_dir)
 
         all_dates = [
             FIRST_COMIC + datetime.timedelta(days=i)
@@ -41,7 +39,7 @@ async def start_download():
 
         pbar = tqdm(total=len(to_process), desc="Downloading comics")
         async with httpx.AsyncClient(
-            limits=httpx.Limits(max_connections=CONCURRENCY * 2)
+            limits=httpx.Limits(max_connections=cfg.concurrency * 2)
         ) as session:
             workers = [
                 asyncio.create_task(
@@ -52,14 +50,15 @@ async def start_download():
                         queue,
                         pbar,
                         existing_dates,
-                        BATCH_COMMIT,
-                        MAX_RETRIES,
+                        cfg.base_dir,
+                        cfg.batch_commit,
+                        cfg.max_retries,
                     )
                 )
-                for i in range(CONCURRENCY)
+                for i in range(cfg.concurrency)
             ]
             await queue.join()
-            for _ in range(CONCURRENCY):
+            for _ in range(cfg.concurrency):
                 await queue.put(None)
             await asyncio.gather(*workers)
         pbar.close()

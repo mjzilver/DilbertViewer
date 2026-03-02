@@ -1,22 +1,49 @@
+from dataclasses import dataclass
 import datetime
 from pathlib import Path
 import httpx
+import argparse
 
 FIRST_COMIC = datetime.date(1989, 4, 16)
 LAST_COMIC = datetime.date(2023, 3, 12)
-BASE_DIR = Path("../Dilbert")
-CONCURRENCY = 20
-LOG_FILE = "dilbert_downloader.log"
-MAX_RETRIES = 3
-BATCH_COMMIT = 50
+
+
+
+@dataclass
+class Config:
+    base_dir: Path = Path("../Dilbert")
+    concurrency: int = 20
+    log_file: str = "dilbert_downloader.log"
+    max_retries: int = 3
+    batch_commit: int = 50
+
+
+def build_config(argv=None) -> Config:
+    parser = argparse.ArgumentParser(description="Dilbert downloader configuration")
+    parser.add_argument("--base-dir", type=Path, default=Path("../Dilbert"), help="Base directory for downloads")
+    parser.add_argument("--concurrency", type=int, default=20, help="Number of concurrent downloads")
+    parser.add_argument("--log-file", type=str, default="dilbert_downloader.log", help="Log file path")
+    parser.add_argument("--max-retries", type=int, default=3, help="Maximum number of retries")
+    parser.add_argument("--batch-commit", type=int, default=50, help="Batch size for commits")
+
+    args = parser.parse_args(argv)
+
+    cfg = Config(
+        base_dir=args.base_dir,
+        concurrency=args.concurrency,
+        log_file=args.log_file,
+        max_retries=args.max_retries,
+        batch_commit=args.batch_commit,
+    )
+
+    cfg.base_dir.mkdir(parents=True, exist_ok=True)
+    return cfg
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
     "Referer": "https://dilbert.com/",
 }
-
-BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 TIMEOUT = httpx.Timeout(
     connect=10.0,
