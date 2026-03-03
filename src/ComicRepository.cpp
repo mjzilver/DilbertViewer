@@ -75,8 +75,9 @@ QList<ComicItem> ComicRepository::comicsForDate(const QString& date) const {
     q.prepare(
         "SELECT date, image_path "
         "FROM comics "
-        "WHERE date = :date");
-    q.bindValue(":date", date);
+        "WHERE date LIKE :date "
+        "ORDER BY date ASC");
+    q.bindValue(":date", "%" + date + "%");
     q.exec();
 
     while (q.next())

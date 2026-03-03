@@ -1,5 +1,8 @@
 #include "ComicSearchWidget.h"
 
+#include <qcombobox.h>
+#include <qcompleter.h>
+
 #include <QComboBox>
 #include <QCompleter>
 #include <QFile>
@@ -13,7 +16,16 @@ ComicSearchWidget::ComicSearchWidget(const QStringList& tags, QWidget* parent)
     : QWidget(parent), modeBox(new QComboBox), edit(new QLineEdit), gallery(new QListWidget) {
     modeBox->addItems({"Tag", "Date", "Transcript"});
 
-    edit->setCompleter(new QCompleter(tags, this));
+    QCompleter* tagCompleter = new QCompleter(tags, this);
+    edit->setCompleter(tagCompleter);
+
+    connect(modeBox, &QComboBox::currentTextChanged, this,
+            [this, tagCompleter](const QString& text) {
+                if (text == "Tag")
+                    edit->setCompleter(tagCompleter);
+                else
+                    edit->setCompleter(nullptr);
+            });
 
     auto* bar = new QHBoxLayout;
     bar->addWidget(modeBox);
