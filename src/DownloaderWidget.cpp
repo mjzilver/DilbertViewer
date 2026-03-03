@@ -1,18 +1,17 @@
 #include "DownloaderWidget.h"
 
 #include <QBoxLayout>
-#include <QObject>
-#include <QPlainTextEdit>
-#include <QProcess>
-#include <QPushButton>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QHBoxLayout>
 #include <QMessageBox>
+#include <QObject>
+#include <QPlainTextEdit>
+#include <QProcess>
+#include <QPushButton>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <utility>
 
 DownloaderWidget::DownloaderWidget(QWidget* parent)
     : QWidget(parent),
@@ -20,7 +19,7 @@ DownloaderWidget::DownloaderWidget(QWidget* parent)
       startBtn(new QPushButton("Start downloading", this)),
       stopBtn(new QPushButton("Stop downloading", this)),
       process(new QProcess(this)),
-      logTimer(new QTimer(this)){
+      logTimer(new QTimer(this)) {
     auto* layout = new QVBoxLayout(this);
 
     textBox->setReadOnly(true);
