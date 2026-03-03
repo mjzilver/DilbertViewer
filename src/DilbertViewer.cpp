@@ -14,10 +14,11 @@
 
 #include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
+#include "DownloaderWidget.h"
 #include "SettingsWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent)
-    : QMainWindow(parent), repo(nullptr), tags(new ComicTagsWidget(this)) {
+    : QMainWindow(parent), repo(nullptr), tags(new ComicTagsWidget(this)), downloader(new DownloaderWidget(this)) {
     auto* tabs = new QTabWidget(this);
 
     setWindowTitle("Dilbert Viewer");
@@ -39,6 +40,9 @@ DilbertViewer::DilbertViewer(QWidget* parent)
     tabs->addTab(settingsWidget, "Settings");
     connect(settingsWidget, &SettingsWidget::settingsChanged, this,
             &DilbertViewer::onSettingsChanged);
+
+    downloader->setDir(dilbertDir);
+    tabs->addTab(downloader, "Downloader");
 
     setCentralWidget(tabs);
 
@@ -145,6 +149,8 @@ void DilbertViewer::onSettingsChanged(const QString& newDbPath, const QString& n
 
     delete repo;
     repo = new ComicRepository(dbPath);
+
+    downloader->setDir(newDilbertDir);
 
     search->setTags(repo->allTags());
     tags->setTags(repo->tagsForComic(currentComicDate));

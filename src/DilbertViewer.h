@@ -6,6 +6,7 @@
 #include "ComicSearchWidget.h"
 #include "ComicTagsWidget.h"
 #include "ComicViewerWidget.h"
+#include "DownloaderWidget.h"
 
 class DilbertViewer : public QMainWindow {
     Q_OBJECT
@@ -23,6 +24,7 @@ private:
     ComicViewerWidget* viewer;
     ComicSearchWidget* search;
     ComicTagsWidget* tags;
+    DownloaderWidget* downloader;
 
     QString dbPath;
     QString dilbertDir;
