@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ComicTask:
-    def __init__(self, date, need_image: bool = True, need_metadata: bool = True):
+    def __init__(self, date, need_image=True, need_metadata=True):
         self.date = date
         self.attempt = 0
         self.last_error = None
@@ -22,7 +22,7 @@ class ComicTask:
         self.need_metadata = need_metadata
 
 
-async def _fetch_archive_page(session, src_url: str):
+async def _fetch_archive_page(session, src_url):
     cdx_url = (
         "https://web.archive.org/cdx/search/cdx?"
         f"url={src_url}&fl=timestamp&filter=statuscode:^2&limit=-1"
@@ -46,7 +46,7 @@ async def _fetch_archive_page(session, src_url: str):
     return html, timestamp, archived_url
 
 
-async def _download_image(session, img_url: str, file_path: Path):
+async def _download_image(session, img_url, file_path):
     img_data, status = await fetch(session, img_url)
     if not img_data:
         raise RuntimeError(f"Image fetch failed ({status})")
@@ -57,9 +57,7 @@ async def _download_image(session, img_url: str, file_path: Path):
     logger.info(f"Downloaded image: {file_path}")
 
 
-async def _extract_and_save_metadata(
-    db, soup: BeautifulSoup, date_str: str, image_path: Path
-):
+async def _extract_and_save_metadata(db, soup, date_str, image_path):
     metadata_div = soup.find("div", class_="meta-info-container")
     if not metadata_div:
         return
@@ -75,7 +73,7 @@ async def _extract_and_save_metadata(
     )
 
 
-async def _needs_work(db, task, date_str: str, base_dir: Path):
+async def _needs_work(db, task, date_str, base_dir):
     need_image = task.need_image
     need_metadata = task.need_metadata
 
@@ -116,13 +114,7 @@ async def _needs_work(db, task, date_str: str, base_dir: Path):
     return need_image, need_metadata
 
 
-async def _handle_image(
-    session,
-    soup,
-    timestamp,
-    file_path,
-    task,
-):
+async def _handle_image(session, soup, timestamp, file_path, task):
     img_tag = soup.find("img", class_="img-comic")
     if not img_tag or not img_tag.get("src"):
         logger.warning(f"No image found for {file_path}")
@@ -202,7 +194,7 @@ async def worker(
     queue,
     pbar,
     existing_dates,
-    base_dir: Path,
+    base_dir,
     BATCH_COMMIT,
     MAX_RETRIES,
 ):

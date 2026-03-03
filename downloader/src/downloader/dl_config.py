@@ -16,7 +16,7 @@ class Config:
     batch_commit: int = 50
 
 
-def build_config(argv=None) -> Config:
+def build_config(argv=None):
     parser = argparse.ArgumentParser(description="Dilbert downloader configuration")
     parser.add_argument(
         "--base-dir",
