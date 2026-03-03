@@ -23,7 +23,7 @@ def main():
         asyncio.run(start_download())
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
-        pass   
+        pass
     logger.info("Downloader finished")
 
 

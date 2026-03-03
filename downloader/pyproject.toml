@@ -12,8 +12,7 @@ dependencies = [
 	"tqdm>=4.65",
 	"beautifulsoup4>=4.12",
 	"aiosqlite>=0.18",
-	"aiofiles>=25.1.0",
-	"wordfreq"
+	"aiofiles>=25.1.0"
 ]
 
 [tool.setuptools.packages.find]

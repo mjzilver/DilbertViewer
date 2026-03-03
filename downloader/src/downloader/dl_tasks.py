@@ -6,7 +6,6 @@ from pathlib import Path
 import aiofiles
 from bs4 import BeautifulSoup
 
-from .dl_config import FIRST_COMIC
 from .dl_utils import fetch
 from .dl_parser import extract_metadata
 from .dl_db import save_comic_with_tags
@@ -235,9 +234,11 @@ async def worker(
                     f"Failed {task.date.isoformat()} "
                     f"after {MAX_RETRIES} attempts: {task.last_error}"
                 )
+                pbar.update(1)
 
             else:
                 processed_since_commit += 1
+                pbar.update(1)
 
                 if processed_since_commit >= BATCH_COMMIT:
                     await db.commit()
@@ -247,7 +248,6 @@ async def worker(
             logger.error(f"Worker {worker_id} crash: {e}")
 
         finally:
-            pbar.update(1)
             queue.task_done()
 
     if processed_since_commit > 0:
