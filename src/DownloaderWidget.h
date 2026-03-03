@@ -1,7 +1,6 @@
 #pragma once
 
-#include <qcontainerfwd.h>
-
+#include <QDebug>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QProcess>
@@ -9,6 +8,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QTextEdit>
+#include <QTimer>
 #include <QWidget>
 
 class DownloaderWidget : public QWidget {
@@ -22,14 +22,16 @@ private slots:
     void startDownloading();
     void stopDownloading();
 
-    void handleStdOut();
-    void handleStdErr();
     void handleProcessFinished(int exitCode, QProcess::ExitStatus status);
     void handleProcessError(QProcess::ProcessError error);
+    void handleStdErr();
+    void updateLogDisplay();
 
 private:
     void appendOutput(const QString& text);
     void updateUiState(bool running);
+
+    const QString logFileName = "dilbert_downloader.log";
 
     QPlainTextEdit* textBox;
     QPushButton* startBtn;
@@ -37,7 +39,8 @@ private:
 
     QProcess* process;
     QProgressBar* progressBar;
-    QString stdoutBuffer;
+    QTimer* logTimer;
+    qint64 lastLogPosition = 0;
 
     QString dir;
 };

@@ -4,7 +4,7 @@ PYTHON := python3
 PIP := $(VENV_DIR)/bin/pip
 PY := $(VENV_DIR)/bin/python
 
-.PHONY: install run format clean build distclean
+.PHONY: setup run format clean build distclean
 
 all: run
 
@@ -12,19 +12,19 @@ $(VENV_DIR):
 	$(PYTHON) -m venv $(VENV_DIR)
 	$(PIP) install -U pip
 
-install: $(VENV_DIR)
+setup: $(VENV_DIR)
 	$(PIP) install -e ".[dev]"
 
-run: install
+run: setup
 	$(PY) -m downloader
 
 format: $(VENV_DIR)
 	$(VENV_DIR)/bin/black . --exclude "$(VENV_DIR)"
 
-build: install
+build: setup
 	$(PY) -m PyInstaller \
 		--onefile \
-		--name downloader \
+		--name dl_downloader \
 		$(SRC_DIR)/downloader/__main__.py
 
 clean:

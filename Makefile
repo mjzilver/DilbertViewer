@@ -1,4 +1,5 @@
 EXEC := DilbertViewer
+DOWNLOADER := dl_downloader
 BUILD_DIR := out
 SRC_DIR := src
 ASSETS_DIR := assets
@@ -62,7 +63,11 @@ install: build
 	install -d $(DESTDIR)$(ICONDIR)
 	install -m 644 $(ICON_FILE) $(DESTDIR)$(ICONDIR)
 
+	cd downloader && $(MAKE) build
+	install -m 755 downloader/dist/$(DOWNLOADER) $(DESTDIR)$(BINDIR)
+
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(EXEC)
 	rm -f $(DESTDIR)$(APPDIR)/$(EXEC).desktop
 	rm -f $(DESTDIR)$(ICONDIR)/dilbert.png
+	rm -f $(DESTDIR)$(ICONDIR)/$(DOWNLOADER)

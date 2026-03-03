@@ -18,7 +18,10 @@
 #include "SettingsWidget.h"
 
 DilbertViewer::DilbertViewer(QWidget* parent)
-    : QMainWindow(parent), repo(nullptr), tags(new ComicTagsWidget(this)), downloader(new DownloaderWidget(this)) {
+    : QMainWindow(parent),
+      repo(nullptr),
+      tags(new ComicTagsWidget(this)),
+      downloader(new DownloaderWidget(this)) {
     auto* tabs = new QTabWidget(this);
 
     setWindowTitle("Dilbert Viewer");
