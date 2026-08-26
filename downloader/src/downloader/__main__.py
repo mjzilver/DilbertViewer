@@ -1,17 +1,25 @@
 import asyncio
+import cProfile
 import logging
 import multiprocessing
+import pstats
+import sys
 
-from downloader.dl_main import start_download
-
-logger = logging.getLogger(__name__)
+from .dl_main import start_download
 
 logging.basicConfig(
     filename="dilbert_downloader.log",
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    force=True,
 )
+
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -19,14 +27,27 @@ def main():
 
     logger.info("Starting Dilbert downloader")
 
-    try:
-        asyncio.run(start_download())
-    except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt")
+    if "--profile" in sys.argv:
+        sys.argv.remove("--profile")
+
+        logger.info("Running with profiling enabled")
+
+        cProfile.run(
+            "asyncio.run(start_download())",
+            "profile_stats.prof",
+        )
+
+        stats = pstats.Stats("profile_stats.prof")
+        stats.strip_dirs().sort_stats("cumulative").print_stats(20)
+
+    else:
+        try:
+            asyncio.run(start_download())
+        except KeyboardInterrupt:
+            logger.info("Received keyboard interrupt")
 
     logger.info("Downloader finished")
 
 
 if __name__ == "__main__":
-    # multiprocessing.freeze_support()
     main()

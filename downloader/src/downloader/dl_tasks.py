@@ -1,14 +1,14 @@
 import asyncio
-import random
 import logging
+import random
 from pathlib import Path
 
 import aiofiles
 from bs4 import BeautifulSoup
 
-from .dl_utils import fetch
-from .dl_parser import extract_metadata
 from .dl_db import save_comic_with_tags
+from .dl_parser import extract_metadata
+from .dl_utils import fetch
 
 logger = logging.getLogger(__name__)
 
@@ -29,19 +29,29 @@ async def _fetch_archive_page(session, src_url):
     )
 
     body, status = await fetch(session, cdx_url)
-    if not body:
-        raise RuntimeError(f"CDX fetch failed ({status})")
+
+    if body is None and status is None:
+        logger.info(f"No Wayback capture found for {src_url}")
+        return None
+
+    if body is None:
+        raise RuntimeError(f"CDX fetch failed ({status}) - URL: {cdx_url}")
 
     lines = body.decode("utf-8").splitlines()
+
     if not lines:
+        logger.info(f"No Wayback capture found for {src_url}")
         return None
 
     timestamp = lines[-1]
     archived_url = f"https://web.archive.org/web/{timestamp}/{src_url}"
 
     html, status = await fetch(session, archived_url)
-    if not html:
-        raise RuntimeError(f"Archive page fetch failed ({status})")
+
+    if html is None:
+        raise RuntimeError(
+            f"Archive page fetch failed ({status}) - URL: {archived_url}"
+        )
 
     return html, timestamp, archived_url
 
@@ -79,17 +89,18 @@ async def _needs_work(db, task, date_str, base_dir):
 
     async with db.execute(
         """
-        SELECT 
-            image_path, 
-            transcript, 
+        SELECT
+            image_path,
+            transcript,
             COALESCE(metadata_checked, 0) as metadata_checked,
             (SELECT COUNT(*) FROM comic_tags WHERE comic_date = ?) as tag_count
-        FROM comics 
+        FROM comics
         WHERE date = ?
         """,
         (date_str, date_str),
     ) as cursor:
         row = await cursor.fetchone()
+
         if row:
             image_path_db, transcript_db, metadata_checked, tag_count = row
 
@@ -103,6 +114,7 @@ async def _needs_work(db, task, date_str, base_dir):
                     or tag_count > 0
                     or metadata_checked > 0
                 )
+
                 if has_metadata:
                     need_metadata = False
 
@@ -111,6 +123,7 @@ async def _needs_work(db, task, date_str, base_dir):
 
 async def _handle_image(session, soup, timestamp, file_path, task):
     img_tag = soup.find("img", class_="img-comic")
+
     if not img_tag or not img_tag.get("src"):
         logger.warning(f"No image found for {file_path}")
         return True
@@ -141,7 +154,12 @@ async def process_comic(session, db, task, existing_dates, base_dir):
 
     file_path = year_folder / f"Dilbert_{date_str}.png"
 
-    need_image, need_metadata = await _needs_work(db, task, date_str, base_dir)
+    need_image, need_metadata = await _needs_work(
+        db,
+        task,
+        date_str,
+        base_dir,
+    )
 
     if not need_image and not need_metadata:
         existing_dates.add(date_str)
@@ -151,6 +169,7 @@ async def process_comic(session, db, task, existing_dates, base_dir):
 
     try:
         result = await _fetch_archive_page(session, src_url)
+
         if not result:
             existing_dates.add(date_str)
             return True
@@ -168,13 +187,25 @@ async def process_comic(session, db, task, existing_dates, base_dir):
 
     if need_metadata:
         try:
-            await _extract_and_save_metadata(db, soup, date_str, file_path)
+            await _extract_and_save_metadata(
+                db,
+                soup,
+                date_str,
+                file_path,
+            )
         except Exception as e:
             task.last_error = f"Metadata error: {e}"
             return False
 
     if need_image:
-        success = await _handle_image(session, soup, timestamp, file_path, task)
+        success = await _handle_image(
+            session,
+            soup,
+            timestamp,
+            file_path,
+            task,
+        )
+
         if not success:
             return False
 
@@ -182,16 +213,27 @@ async def process_comic(session, db, task, existing_dates, base_dir):
     return True
 
 
+async def _retry_task(queue, task):
+    delay = (2**task.attempt) + random.random()
+
+    logger.debug(
+        f"Retrying {task.date.isoformat()} " f"in {delay:.2f}s (attempt {task.attempt})"
+    )
+
+    await asyncio.sleep(delay)
+    await queue.put(task)
+
+
 async def worker(
     worker_id,
     session,
     db,
     queue,
-    pbar,
     existing_dates,
     base_dir,
     BATCH_COMMIT,
     MAX_RETRIES,
+    db_commit_lock,
 ):
     processed_since_commit = 0
 
@@ -213,29 +255,55 @@ async def worker(
 
             if not success and task.attempt < MAX_RETRIES:
                 task.attempt += 1
-                await asyncio.sleep((2**task.attempt) + random.random())
+
+                delay = (2**task.attempt) + random.random()
+
+                logger.warning(
+                    "Worker %d: retrying %s in %.2fs " "(attempt %d/%d): %s",
+                    worker_id,
+                    task.date.isoformat(),
+                    delay,
+                    task.attempt,
+                    MAX_RETRIES,
+                    task.last_error,
+                )
+
+                await asyncio.sleep(delay)
                 await queue.put(task)
 
             elif not success:
                 logger.error(
-                    f"Failed {task.date.isoformat()} "
-                    f"after {MAX_RETRIES} attempts: {task.last_error}"
+                    "Worker %d: failed %s after %d attempts: %s",
+                    worker_id,
+                    task.date.isoformat(),
+                    MAX_RETRIES,
+                    task.last_error,
                 )
-                pbar.update(1)
 
             else:
                 processed_since_commit += 1
-                pbar.update(1)
 
                 if processed_since_commit >= BATCH_COMMIT:
-                    await db.commit()
+                    logger.info(
+                        "Worker %d committing to database...",
+                        worker_id,
+                    )
+
+                    async with db_commit_lock:
+                        await db.commit()
+
                     processed_since_commit = 0
 
-        except Exception as e:
-            logger.error(f"Worker {worker_id} crash: {e}")
+        except Exception:
+            logger.exception(
+                "Worker %d crashed while processing %s",
+                worker_id,
+                task.date.isoformat(),
+            )
 
         finally:
             queue.task_done()
 
     if processed_since_commit > 0:
-        await db.commit()
+        async with db_commit_lock:
+            await db.commit()
