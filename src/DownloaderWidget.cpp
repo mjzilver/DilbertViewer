@@ -51,10 +51,10 @@ void DownloaderWidget::setDir(QString dir) { this->dir = std::move(dir); }
 
 void DownloaderWidget::startDownloading() {
     QString basePath = QCoreApplication::applicationDirPath();
-    QString exePath = QDir(basePath).filePath("downloader");
+    QString exePath = QDir(basePath).filePath("dl_downloader");
 
     if (!QFileInfo::exists(exePath) || !QFileInfo(exePath).isExecutable()) {
-        QMessageBox::critical(this, "Error", "Downloader executable not found:\n" + exePath);
+        QMessageBox::critical(this, "Error", "dl_downloader executable not found:\n" + exePath);
         return;
     }
 
@@ -95,13 +95,11 @@ void DownloaderWidget::handleProcessFinished(int exitCode, QProcess::ExitStatus 
     textBox->appendPlainText("\nProcess finished.\n");
 }
 
-void DownloaderWidget::handleProcessError(QProcess::ProcessError error) {
-    Q_UNUSED(error)
-
+void DownloaderWidget::handleProcessError(QProcess::ProcessError) {
     logTimer->stop();
     updateUiState(false);
 
-    textBox->appendPlainText("\nProcess error occurred.\n");
+    textBox->appendPlainText("\nProcess error occurred: " + process->errorString());
 }
 
 void DownloaderWidget::handleStdErr() {

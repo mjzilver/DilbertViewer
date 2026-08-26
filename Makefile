@@ -23,6 +23,7 @@ ICON_FILE = $(ASSETS_DIR)/dilbert.png
 all: run
 
 build: $(BUILD_DIR)
+	$(MAKE) $(MAKE_FLAGS) -C downloader build
 	cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Release .. && $(MAKE) $(MAKE_FLAGS) $(EXEC)
 
 build-debug: $(BUILD_DIR)
@@ -32,6 +33,7 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 run: build
+	cp downloader/dist/$(DOWNLOADER) $(BUILD_DIR)/$(DOWNLOADER)
 	./$(BUILD_DIR)/$(EXEC)
 
 debug: build-debug
@@ -50,6 +52,7 @@ clean:
 
 format:
 	clang-format -i $(CPP_FILES) $(H_FILES)
+	$(MAKE) $(MAKE_FLAGS) -C downloader format
 
 tidy: $(BUILD_DIR)/Makefile
 	clang-tidy -p $(BUILD_DIR) $(CPP_FILES) $(H_FILES)

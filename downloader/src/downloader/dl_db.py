@@ -73,8 +73,6 @@ async def save_comic_with_tags(db, date_str, relative_path, transcript, tags):
                 (date_str, tag_id),
             )
 
-    await db.commit()
-
 
 async def load_existing_dates(db, base_dir: Path):
 

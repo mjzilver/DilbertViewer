@@ -77,39 +77,34 @@ async def _needs_work(db, task, date_str, base_dir):
     need_image = task.need_image
     need_metadata = task.need_metadata
 
-    image_path_db = None
-    transcript_db = None
-    metadata_checked = 0
-
     async with db.execute(
-        "SELECT image_path, transcript, COALESCE(metadata_checked,0) "
-        "FROM comics WHERE date=?",
-        (date_str,),
+        """
+        SELECT 
+            image_path, 
+            transcript, 
+            COALESCE(metadata_checked, 0) as metadata_checked,
+            (SELECT COUNT(*) FROM comic_tags WHERE comic_date = ?) as tag_count
+        FROM comics 
+        WHERE date = ?
+        """,
+        (date_str, date_str),
     ) as cursor:
         row = await cursor.fetchone()
         if row:
-            image_path_db, transcript_db, metadata_checked = row
+            image_path_db, transcript_db, metadata_checked, tag_count = row
 
-    if need_image and image_path_db:
-        if (base_dir / image_path_db).exists():
-            need_image = False
+            if need_image and image_path_db:
+                if (base_dir / image_path_db).exists():
+                    need_image = False
 
-    if need_metadata:
-        async with db.execute(
-            "SELECT COUNT(*) FROM comic_tags WHERE comic_date=?",
-            (date_str,),
-        ) as c:
-            r = await c.fetchone()
-            tag_count = r[0] if r else 0
-
-        has_metadata = (
-            bool(transcript_db and transcript_db.strip())
-            or tag_count > 0
-            or metadata_checked > 0
-        )
-
-        if has_metadata:
-            need_metadata = False
+            if need_metadata:
+                has_metadata = (
+                    bool(transcript_db and transcript_db.strip())
+                    or tag_count > 0
+                    or metadata_checked > 0
+                )
+                if has_metadata:
+                    need_metadata = False
 
     return need_image, need_metadata
 
