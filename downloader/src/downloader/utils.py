@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import httpx
-from downloader.dl_config import HEADERS, TIMEOUT
+from .config import HEADERS, TIMEOUT
 
 logger = logging.getLogger(__name__)
 

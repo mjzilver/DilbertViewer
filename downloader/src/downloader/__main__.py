@@ -1,8 +1,8 @@
 import asyncio
 import logging
 
-from .dl_config import build_config
-from .dl_tasks import Downloader
+from .config import build_config
+from .engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,8 @@ async def start_download():
 
     logger.info(cfg)
 
-    downloader = Downloader(cfg)
-    await downloader.run()
+    engine = Engine(cfg)
+    await engine.run()
 
 
 def main():
