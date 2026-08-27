@@ -21,7 +21,7 @@ def configure_logging():
     )
 
 
-async def start_download():
+async def start_download() -> None:
     cfg = build_config()
 
     logger.info(cfg)
@@ -30,7 +30,7 @@ async def start_download():
     await engine.run()
 
 
-def main():
+def main() -> None:
     configure_logging()
 
     try:

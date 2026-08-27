@@ -6,7 +6,9 @@ from .config import HEADERS, TIMEOUT
 logger = logging.getLogger(__name__)
 
 
-async def fetch(session, url):
+async def fetch(
+    session: httpx.AsyncClient, url: str
+) -> tuple[bytes | None, int | None]:
     try:
         resp = await session.get(
             url, headers=HEADERS, timeout=TIMEOUT, follow_redirects=True

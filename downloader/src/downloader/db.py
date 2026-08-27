@@ -1,10 +1,11 @@
 import logging
 from pathlib import Path
+import aiosqlite
 
 logger = logging.getLogger(__name__)
 
 
-async def create_tables(db):
+async def create_tables(db: aiosqlite.Connection) -> None:
     await db.executescript("""
         CREATE TABLE IF NOT EXISTS comics (
             date TEXT PRIMARY KEY,
@@ -28,7 +29,13 @@ async def create_tables(db):
         """)
 
 
-async def save_comic_with_tags(db, date_str, relative_path, transcript, tags):
+async def save_comic_with_tags(
+    db: aiosqlite.Connection,
+    date_str: str,
+    relative_path: Path,
+    transcript: str | None,
+    tags: list[str],
+) -> None:
 
     async with db.execute(
         "SELECT transcript FROM comics WHERE date=?",
@@ -76,7 +83,7 @@ async def save_comic_with_tags(db, date_str, relative_path, transcript, tags):
     await db.commit()
 
 
-async def load_existing_dates(db, base_dir: Path):
+async def load_existing_dates(db: aiosqlite.Connection, base_dir: Path):
 
     existing_dates = set()
 

@@ -1,4 +1,7 @@
-def extract_metadata(metadata_div):
+from bs4 import BeautifulSoup
+
+
+def extract_metadata(metadata_div: BeautifulSoup) -> tuple[str, list[str]]:
     tags = []
     tags_p = metadata_div.find("p", class_="small comic-tags")
     if tags_p:

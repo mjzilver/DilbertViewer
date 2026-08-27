@@ -113,7 +113,9 @@ class ComicProcessor:
 
         return need_image, need_metadata
 
-    async def _extract_and_save_metadata(self, soup, date_str, image_path) -> None:
+    async def _extract_and_save_metadata(
+        self, soup: BeautifulSoup, date_str: str, image_path: Path
+    ) -> None:
         metadata_div = soup.find("div", class_="meta-info-container")
         if not metadata_div:
             return
@@ -136,7 +138,7 @@ class ComicProcessor:
             bool(tags),
         )
 
-    async def _fetch_archive_page(self, src_url: str):
+    async def _fetch_archive_page(self, src_url: str) -> tuple[bytes, str] | None:
         cdx_url = (
             "https://web.archive.org/cdx/search/cdx?"
             f"url={src_url}"
@@ -161,8 +163,8 @@ class ComicProcessor:
         html, status = await fetch(self.engine.session, archived_url)
         if html is None:
             raise RuntimeError(
-                f"Archive page fetch failed ({status}) - URL: {html}"
-            )  # Error in logic here, should be archived_url
+                f"Archive page fetch failed ({status}) - URL: {archived_url}"
+            )
 
         return html, timestamp
 
@@ -176,7 +178,9 @@ class ComicProcessor:
 
         logger.info("Downloaded image: %s", file_path)
 
-    async def _handle_image(self, soup, timestamp, file_path, task):
+    async def _handle_image(
+        self, soup: BeautifulSoup, timestamp: str, file_path: Path, task: ComicTask
+    ) -> bool:
         img_tag = soup.find("img", class_="img-comic")
         if not img_tag or not img_tag.get("src"):
             logger.warning(f"No image found for {file_path}")

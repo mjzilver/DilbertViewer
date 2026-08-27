@@ -48,6 +48,10 @@ class Progress:
 
     @property
     def percentage(self) -> float:
+        if self.total == 0:
+            return 0.0
+        return (self.completed / self.total) * 100.0
+
         if not self.total:
             return 100.0
 

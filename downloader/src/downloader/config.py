@@ -1,8 +1,8 @@
-from dataclasses import dataclass
+import argparse
 import datetime
+from dataclasses import dataclass
 from pathlib import Path
 import httpx
-import argparse
 
 FIRST_COMIC = datetime.date(1989, 4, 16)
 LAST_COMIC = datetime.date(2023, 3, 12)
@@ -16,7 +16,7 @@ class Config:
     tor: bool = False
 
 
-def build_config(argv=None):
+def build_config(argv: list[str] | None = None) -> Config:
     parser = argparse.ArgumentParser(description="Dilbert downloader configuration")
     parser.add_argument(
         "--base-dir",

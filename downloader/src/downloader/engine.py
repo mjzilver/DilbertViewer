@@ -6,7 +6,7 @@ import random
 import httpx
 import aiosqlite
 
-from .config import FIRST_COMIC, LAST_COMIC, TIMEOUT
+from .config import Config, FIRST_COMIC, LAST_COMIC, TIMEOUT
 from .db import create_tables, load_existing_dates
 from .models import ComicTask, Progress
 from .processor import ComicProcessor
@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class Engine:
-    def __init__(self, cfg):
+    def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
 
-        self.db = None
-        self.session = None
-        self.queue = asyncio.Queue()
+        self.db: aiosqlite.Connection | None = None
+        self.session: httpx.AsyncClient | None = None
+        self.queue: asyncio.Queue[ComicTask] = asyncio.Queue()
 
         self.existing_dates: set[str] = set()
 
@@ -209,7 +209,7 @@ class Engine:
 
     def _log_summary(self) -> None:
         logger.info(
-            "Download complete. Total: %d, Completed: %s, Failed: %s",
+            "Download complete. Total: %d, Completed: %d, Failed: %d",
             self.progress.total,
             self.progress.completed,
             self.progress.failed,
