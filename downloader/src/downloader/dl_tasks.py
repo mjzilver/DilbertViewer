@@ -1,309 +1,610 @@
 import asyncio
+import datetime
 import logging
 import random
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import aiofiles
 from bs4 import BeautifulSoup
+from downloader.dl_config import FIRST_COMIC, LAST_COMIC, TIMEOUT, build_config
 
-from .dl_db import save_comic_with_tags
+from .dl_db import create_tables, load_existing_dates, save_comic_with_tags
 from .dl_parser import extract_metadata
 from .dl_utils import fetch
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class ComicTask:
-    def __init__(self, date, need_image=True, need_metadata=True):
-        self.date = date
-        self.attempt = 0
-        self.last_error = None
-        self.need_image = need_image
-        self.need_metadata = need_metadata
+    date: object
+    attempt: int = 0
+    last_error: str | None = None
+    need_image: bool = True
+    need_metadata: bool = True
 
 
-async def _fetch_archive_page(session, src_url):
-    cdx_url = (
-        "https://web.archive.org/cdx/search/cdx?"
-        f"url={src_url}&fl=timestamp&filter=statuscode:^2&limit=-1"
-    )
+@dataclass
+class WorkerProgress:
+    status: str = "idle"
+    current_date: str | None = None
+    attempt: int = 0
 
-    body, status = await fetch(session, cdx_url)
 
-    if body is None and status is None:
-        logger.info(f"No Wayback capture found for {src_url}")
-        return None
+@dataclass
+class Progress:
+    total: int = 0
+    completed: int = 0
+    failed: int = 0
+    start_time: float = field(default_factory=time.monotonic)
 
-    if body is None:
-        raise RuntimeError(f"CDX fetch failed ({status}) - URL: {cdx_url}")
+    workers: dict[int, WorkerProgress] = field(default_factory=dict)
 
-    lines = body.decode("utf-8").splitlines()
+    @property
+    def finished(self) -> int:
+        return self.completed + self.failed
 
-    if not lines:
-        logger.info(f"No Wayback capture found for {src_url}")
-        return None
+    @property
+    def pending(self) -> int:
+        return max(0, self.total - self.finished - self.active)
 
-    timestamp = lines[-1]
-    archived_url = f"https://web.archive.org/web/{timestamp}/{src_url}"
-
-    html, status = await fetch(session, archived_url)
-
-    if html is None:
-        raise RuntimeError(
-            f"Archive page fetch failed ({status}) - URL: {archived_url}"
+    @property
+    def active(self) -> int:
+        return sum(
+            worker.status in ("active", "retrying") for worker in self.workers.values()
         )
 
-    return html, timestamp, archived_url
+    @property
+    def retrying(self) -> int:
+        return sum(worker.status == "retrying" for worker in self.workers.values())
+
+    @property
+    def percentage(self) -> float:
+        if not self.total:
+            return 100.0
+
+        return self.finished / self.total * 100
+
+    def worker(self, worker_id: int) -> WorkerProgress:
+        return self.workers.setdefault(worker_id, WorkerProgress())
+
+    def mark_active(self, worker_id: int, task: ComicTask) -> None:
+        worker = self.worker(worker_id)
+        worker.status = "active"
+        worker.current_date = task.date.isoformat()
+        worker.attempt = task.attempt
+
+    def mark_retrying(self, worker_id: int, task: ComicTask) -> None:
+        worker = self.worker(worker_id)
+        worker.status = "retrying"
+        worker.current_date = task.date.isoformat()
+        worker.attempt = task.attempt
+
+    def mark_idle(self, worker_id: int) -> None:
+        worker = self.worker(worker_id)
+        worker.status = "idle"
+        worker.current_date = None
+        worker.attempt = 0
+
+    def mark_stopped(self, worker_id: int) -> None:
+        worker = self.worker(worker_id)
+        worker.status = "stopped"
+        worker.current_date = None
+
+    def mark_completed(self) -> None:
+        self.completed += 1
+
+    def mark_failed(self) -> None:
+        self.failed += 1
 
 
-async def _download_image(session, img_url, file_path):
-    img_data, status = await fetch(session, img_url)
-    if not img_data:
-        raise RuntimeError(f"Image fetch failed ({status})")
+class Downloader:
+    def __init__(self, cfg):
+        self.cfg = cfg
 
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(img_data)
+        self.db = None
+        self.session = None
+        self.queue = asyncio.Queue()
 
-    logger.info(f"Downloaded image: {file_path}")
+        self.existing_dates: set[str] = set()
 
+        self.progress = Progress()
 
-async def _extract_and_save_metadata(db, soup, date_str, image_path):
-    metadata_div = soup.find("div", class_="meta-info-container")
-    if not metadata_div:
-        return
+        self._workers: list[asyncio.Task] = []
+        self._progress_task: asyncio.Task | None = None
 
-    transcript, tags = extract_metadata(metadata_div)
+    async def run(self) -> None:
+        await self._open_database()
 
-    relative_path = Path(str(image_path.relative_to(image_path.parents[1])))
-    await save_comic_with_tags(db, date_str, relative_path, transcript, tags)
+        try:
+            await self._prepare_tasks()
+            await self._start_session()
+            await self._start_workers()
 
-    logger.info(
-        f"Saved metadata for {image_path} | "
-        f"Transcript: {bool(transcript)} | Tags: {bool(tags)}"
-    )
+            self._progress_task = asyncio.create_task(self._report_progress())
 
+            await self.queue.join()
 
-async def _needs_work(db, task, date_str, base_dir):
-    need_image = task.need_image
-    need_metadata = task.need_metadata
+            await self._stop_workers()
 
-    async with db.execute(
-        """
-        SELECT
-            image_path,
-            transcript,
-            COALESCE(metadata_checked, 0) as metadata_checked,
-            (SELECT COUNT(*) FROM comic_tags WHERE comic_date = ?) as tag_count
-        FROM comics
-        WHERE date = ?
-        """,
-        (date_str, date_str),
-    ) as cursor:
-        row = await cursor.fetchone()
+            await self._progress_task
 
-        if row:
-            image_path_db, transcript_db, metadata_checked, tag_count = row
+            self._log_summary()
 
-            if need_image and image_path_db:
-                if (base_dir / image_path_db).exists():
-                    need_image = False
+        finally:
+            await self._close_session()
+            await self._close_database()
 
-            if need_metadata:
-                has_metadata = (
-                    bool(transcript_db and transcript_db.strip())
-                    or tag_count > 0
-                    or metadata_checked > 0
+    async def _open_database(self) -> None:
+        import aiosqlite
+
+        db_path = self.cfg.base_dir / "metadata.db"
+
+        self.db = await aiosqlite.connect(db_path)
+
+        await create_tables(self.db)
+        await self.db.commit()
+
+        self.existing_dates = await load_existing_dates(
+            self.db,
+            self.cfg.base_dir,
+        )
+
+    async def _close_database(self) -> None:
+        if self.db is not None:
+            await self.db.close()
+            self.db = None
+
+    async def _start_session(self) -> None:
+        import httpx
+
+        client_kwargs = {
+            "timeout": TIMEOUT,
+            "limits": httpx.Limits(
+                max_connections=self.cfg.concurrency,
+                max_keepalive_connections=self.cfg.concurrency,
+            ),
+        }
+
+        if self.cfg.tor:
+            client_kwargs["proxy"] = "socks5://127.0.0.1:9050"
+
+            logger.info("Using Tor SOCKS5 proxy at 127.0.0.1:9050")
+
+        self.session = httpx.AsyncClient(**client_kwargs)
+
+    async def _close_session(self) -> None:
+        if self.session is not None:
+            await self.session.aclose()
+            self.session = None
+
+    async def _prepare_tasks(self) -> None:
+        all_dates = [
+            FIRST_COMIC + datetime.timedelta(days=i)
+            for i in range((LAST_COMIC - FIRST_COMIC).days + 1)
+        ]
+
+        to_process = [
+            date for date in all_dates if date.isoformat() not in self.existing_dates
+        ]
+
+        self.progress.total = len(to_process)
+
+        logger.info(
+            "Found %d comics to process out of %d total comics",
+            len(to_process),
+            len(all_dates),
+        )
+
+        for date in to_process:
+            await self.queue.put(ComicTask(date))
+
+    async def _start_workers(self) -> None:
+        self._workers = [
+            asyncio.create_task(self._worker(worker_id))
+            for worker_id in range(self.cfg.concurrency)
+        ]
+
+    async def _stop_workers(self) -> None:
+        for _ in self._workers:
+            await self.queue.put(None)
+
+        await asyncio.gather(*self._workers)
+
+        self._workers.clear()
+
+    async def _worker(self, worker_id: int) -> None:
+        while True:
+            self.progress.mark_idle(worker_id)
+
+            task = await self.queue.get()
+
+            if task is None:
+                self.queue.task_done()
+                self.progress.mark_stopped(worker_id)
+                return
+
+            requeued = False
+
+            try:
+                self.progress.mark_active(worker_id, task)
+
+                success = await self._process_comic(task)
+
+                if success:
+                    self.progress.mark_completed()
+
+                elif task.attempt < self.cfg.max_retries:
+                    task.attempt += 1
+                    requeued = True
+
+                    self.progress.mark_retrying(worker_id, task)
+
+                    delay = (2**task.attempt) + random.random()
+
+                    logger.warning(
+                        "Worker %d: retrying %s in %.2fs " "(attempt %d/%d): %s",
+                        worker_id,
+                        task.date.isoformat(),
+                        delay,
+                        task.attempt,
+                        self.cfg.max_retries,
+                        task.last_error,
+                    )
+
+                    await asyncio.sleep(delay)
+                    await self.queue.put(task)
+
+                else:
+                    self.progress.mark_failed()
+
+                    logger.error(
+                        "Worker %d: failed %s after %d attempts: %s",
+                        worker_id,
+                        task.date.isoformat(),
+                        self.cfg.max_retries,
+                        task.last_error,
+                    )
+
+            except Exception:
+                logger.exception(
+                    "Worker %d crashed while processing %s",
+                    worker_id,
+                    task.date.isoformat(),
                 )
 
-                if has_metadata:
-                    need_metadata = False
+                self.progress.mark_failed()
 
-    return need_image, need_metadata
+            finally:
+                self.queue.task_done()
 
+                if not requeued:
+                    self.progress.mark_idle(worker_id)
 
-async def _handle_image(session, soup, timestamp, file_path, task):
-    img_tag = soup.find("img", class_="img-comic")
+    async def _process_comic(self, task: ComicTask) -> bool:
+        date = task.date
+        date_str = date.isoformat()
 
-    if not img_tag or not img_tag.get("src"):
-        logger.warning(f"No image found for {file_path}")
-        return True
+        year_folder = self.cfg.base_dir / str(date.year)
+        year_folder.mkdir(parents=True, exist_ok=True)
 
-    img_src = img_tag["src"]
+        file_path = year_folder / f"Dilbert_{date_str}.png"
 
-    img_url = (
-        img_src
-        if img_src.startswith("https://web.archive.org/")
-        else f"https://web.archive.org/web/{timestamp}im_/{img_src}"
-    )
+        need_image, need_metadata = await self._needs_work(
+            task,
+            date_str,
+        )
 
-    try:
-        await _download_image(session, img_url, file_path)
-    except Exception as e:
-        task.last_error = f"Image download error: {e}"
-        return False
-
-    return True
-
-
-async def process_comic(session, db, task, existing_dates, base_dir):
-    date = task.date
-    date_str = date.isoformat()
-
-    year_folder = base_dir / str(date.year)
-    year_folder.mkdir(parents=True, exist_ok=True)
-
-    file_path = year_folder / f"Dilbert_{date_str}.png"
-
-    need_image, need_metadata = await _needs_work(
-        db,
-        task,
-        date_str,
-        base_dir,
-    )
-
-    if not need_image and not need_metadata:
-        existing_dates.add(date_str)
-        return True
-
-    src_url = f"https://dilbert.com/strip/{date_str}"
-
-    try:
-        result = await _fetch_archive_page(session, src_url)
-
-        if not result:
-            existing_dates.add(date_str)
+        if not need_image and not need_metadata:
+            self.existing_dates.add(date_str)
             return True
 
-        html, timestamp, archived_page_url = result
+        src_url = f"https://dilbert.com/strip/{date_str}"
 
-    except Exception as e:
-        task.last_error = str(e)
-        return False
-
-    soup = BeautifulSoup(
-        html.decode("utf-8", errors="ignore"),
-        "html.parser",
-    )
-
-    if need_metadata:
         try:
-            await _extract_and_save_metadata(
-                db,
+            result = await self._fetch_archive_page(src_url)
+
+            if result is None:
+                self.existing_dates.add(date_str)
+                return True
+
+            html, timestamp = result
+
+        except Exception as e:
+            task.last_error = str(e)
+            return False
+
+        soup = BeautifulSoup(
+            html.decode("utf-8", errors="ignore"),
+            "html.parser",
+        )
+
+        if need_metadata:
+            try:
+                await self._extract_and_save_metadata(
+                    soup,
+                    date_str,
+                    file_path,
+                )
+            except Exception as e:
+                task.last_error = f"Metadata error: {e}"
+                return False
+
+        if need_image:
+            success = await self._handle_image(
                 soup,
-                date_str,
+                timestamp,
+                file_path,
+                task,
+            )
+
+            if not success:
+                return False
+
+        await self.db.commit()
+
+        self.existing_dates.add(date_str)
+
+        return True
+
+    async def _needs_work(
+        self,
+        task: ComicTask,
+        date_str: str,
+    ) -> tuple[bool, bool]:
+
+        need_image = task.need_image
+        need_metadata = task.need_metadata
+
+        async with self.db.execute(
+            """
+            SELECT
+                image_path,
+                transcript,
+                COALESCE(metadata_checked, 0),
+                (
+                    SELECT COUNT(*)
+                    FROM comic_tags
+                    WHERE comic_date = ?
+                )
+            FROM comics
+            WHERE date = ?
+            """,
+            (date_str, date_str),
+        ) as cursor:
+            row = await cursor.fetchone()
+
+        if not row:
+            return need_image, need_metadata
+
+        image_path_db, transcript_db, metadata_checked, tag_count = row
+
+        if need_image and image_path_db:
+            if (self.cfg.base_dir / image_path_db).exists():
+                need_image = False
+
+        if need_metadata:
+            has_metadata = (
+                bool(transcript_db and transcript_db.strip())
+                or tag_count > 0
+                or metadata_checked > 0
+            )
+
+            if has_metadata:
+                need_metadata = False
+
+        return need_image, need_metadata
+
+    async def _extract_and_save_metadata(
+        self,
+        soup,
+        date_str,
+        image_path,
+    ) -> None:
+
+        metadata_div = soup.find(
+            "div",
+            class_="meta-info-container",
+        )
+
+        if not metadata_div:
+            return
+
+        transcript, tags = extract_metadata(metadata_div)
+
+        relative_path = Path(str(image_path.relative_to(image_path.parents[1])))
+
+        await save_comic_with_tags(
+            self.db,
+            date_str,
+            relative_path,
+            transcript,
+            tags,
+        )
+
+        logger.info(
+            "Saved metadata for %s | " "Transcript: %s | Tags: %s",
+            image_path,
+            bool(transcript),
+            bool(tags),
+        )
+
+    async def _fetch_archive_page(self, src_url):
+        cdx_url = (
+            "https://web.archive.org/cdx/search/cdx?"
+            f"url={src_url}"
+            "&fl=timestamp"
+            "&filter=statuscode:^2"
+            "&limit=-1"
+        )
+
+        body, status = await fetch(
+            self.session,
+            cdx_url,
+        )
+
+        if body is None:
+            raise RuntimeError(f"CDX fetch failed ({status}) - URL: {cdx_url}")
+
+        lines = body.decode("utf-8").splitlines()
+
+        if not lines:
+            logger.info(
+                "No Wayback capture found for %s",
+                src_url,
+            )
+            return None
+
+        timestamp = lines[-1]
+
+        archived_url = f"https://web.archive.org/web/" f"{timestamp}/{src_url}"
+
+        html, status = await fetch(
+            self.session,
+            archived_url,
+        )
+
+        if html is None:
+            raise RuntimeError(
+                f"Archive page fetch failed ({status}) " f"- URL: {archived_url}"
+            )
+
+        return html, timestamp
+
+    async def _download_image(
+        self,
+        img_url,
+        file_path,
+    ) -> None:
+
+        img_data, status = await fetch(
+            self.session,
+            img_url,
+        )
+
+        if not img_data:
+            raise RuntimeError(f"Image fetch failed ({status})")
+
+        async with aiofiles.open(
+            file_path,
+            "wb",
+        ) as f:
+            await f.write(img_data)
+
+        logger.info(
+            "Downloaded image: %s",
+            file_path,
+        )
+
+    async def _handle_image(
+        self,
+        soup,
+        timestamp,
+        file_path,
+        task,
+    ) -> bool:
+
+        img_tag = soup.find(
+            "img",
+            class_="img-comic",
+        )
+
+        if not img_tag or not img_tag.get("src"):
+            logger.warning(
+                "No image found for %s",
+                file_path,
+            )
+            return True
+
+        img_src = img_tag["src"]
+
+        img_url = (
+            img_src
+            if img_src.startswith("https://web.archive.org/")
+            else ("https://web.archive.org/web/" f"{timestamp}im_/{img_src}")
+        )
+
+        try:
+            await self._download_image(
+                img_url,
                 file_path,
             )
         except Exception as e:
-            task.last_error = f"Metadata error: {e}"
+            task.last_error = f"Image download error: {e}"
             return False
 
-    if need_image:
-        success = await _handle_image(
-            session,
-            soup,
-            timestamp,
-            file_path,
-            task,
-        )
+        return True
 
-        if not success:
-            return False
+    async def _report_progress(self) -> None:
+        last_finished = 0
+        last_time = time.monotonic()
 
-    existing_dates.add(date_str)
-    return True
+        while self.progress.finished < self.progress.total:
+            await asyncio.sleep(10)
 
+            now = time.monotonic()
 
-async def _retry_task(queue, task):
-    delay = (2**task.attempt) + random.random()
+            finished = self.progress.finished
 
-    logger.debug(
-        f"Retrying {task.date.isoformat()} " f"in {delay:.2f}s (attempt {task.attempt})"
-    )
+            elapsed = now - last_time
+            finished_since_last = finished - last_finished
 
-    await asyncio.sleep(delay)
-    await queue.put(task)
+            current_rate = finished_since_last / elapsed * 60 if elapsed > 0 else 0
 
+            total_elapsed = now - self.progress.start_time
 
-async def worker(
-    worker_id,
-    session,
-    db,
-    queue,
-    existing_dates,
-    base_dir,
-    BATCH_COMMIT,
-    MAX_RETRIES,
-    db_commit_lock,
-):
-    processed_since_commit = 0
+            average_rate = finished / total_elapsed * 60 if total_elapsed > 0 else 0
 
-    while True:
-        task = await queue.get()
-
-        if task is None:
-            queue.task_done()
-            break
-
-        try:
-            success = await process_comic(
-                session,
-                db,
-                task,
-                existing_dates,
-                base_dir,
+            logger.info(
+                "Progress: %d/%d (%.1f%%) | "
+                "Rate: %.1f/min | Avg: %.1f/min | "
+                "Pending: %d | Active: %d | "
+                "Retrying: %d | Failed: %d",
+                finished,
+                self.progress.total,
+                self.progress.percentage,
+                current_rate,
+                average_rate,
+                self.progress.pending,
+                self.progress.active,
+                self.progress.retrying,
+                self.progress.failed,
             )
 
-            if not success and task.attempt < MAX_RETRIES:
-                task.attempt += 1
-
-                delay = (2**task.attempt) + random.random()
-
-                logger.warning(
-                    "Worker %d: retrying %s in %.2fs " "(attempt %d/%d): %s",
-                    worker_id,
-                    task.date.isoformat(),
-                    delay,
-                    task.attempt,
-                    MAX_RETRIES,
-                    task.last_error,
-                )
-
-                await asyncio.sleep(delay)
-                await queue.put(task)
-
-            elif not success:
-                logger.error(
-                    "Worker %d: failed %s after %d attempts: %s",
-                    worker_id,
-                    task.date.isoformat(),
-                    MAX_RETRIES,
-                    task.last_error,
-                )
-
-            else:
-                processed_since_commit += 1
-
-                if processed_since_commit >= BATCH_COMMIT:
+            for worker_id, worker in self.progress.workers.items():
+                if worker.status in (
+                    "active",
+                    "retrying",
+                ):
                     logger.info(
-                        "Worker %d committing to database...",
+                        "  Worker %d: %s %s " "(attempt %d)",
                         worker_id,
+                        worker.status,
+                        worker.current_date,
+                        worker.attempt,
                     )
 
-                    async with db_commit_lock:
-                        await db.commit()
+            last_finished = finished
+            last_time = now
 
-                    processed_since_commit = 0
+    def _log_summary(self) -> None:
+        elapsed = time.monotonic() - self.progress.start_time
 
-        except Exception:
-            logger.exception(
-                "Worker %d crashed while processing %s",
-                worker_id,
-                task.date.isoformat(),
-            )
+        logger.info(
+            "Download finished: " "%d completed, %d failed, " "%d total in %.1fs",
+            self.progress.completed,
+            self.progress.failed,
+            self.progress.total,
+            elapsed,
+        )
 
-        finally:
-            queue.task_done()
 
-    if processed_since_commit > 0:
-        async with db_commit_lock:
-            await db.commit()
+async def start_download():
+    cfg = build_config()
+
+    logger.info(cfg)
+
+    downloader = Downloader(cfg)
+    await downloader.run()

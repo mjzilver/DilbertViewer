@@ -13,7 +13,7 @@ class Config:
     base_dir: Path = Path("../Dilbert")
     concurrency: int = 20
     max_retries: int = 3
-    batch_commit: int = 50
+    tor: bool = False
 
 
 def build_config(argv=None):
@@ -31,7 +31,9 @@ def build_config(argv=None):
         "--max-retries", type=int, default=3, help="Maximum number of retries"
     )
     parser.add_argument(
-        "--batch-commit", type=int, default=50, help="Batch size for commits"
+        "--tor",
+        action="store_true",
+        help="Route HTTP requests through Tor SOCKS5 at 127.0.0.1:9050",
     )
 
     args = parser.parse_args(argv)
@@ -40,7 +42,7 @@ def build_config(argv=None):
         base_dir=args.base_dir,
         concurrency=args.concurrency,
         max_retries=args.max_retries,
-        batch_commit=args.batch_commit,
+        tor=args.tor,
     )
 
     cfg.base_dir.mkdir(parents=True, exist_ok=True)
@@ -54,7 +56,7 @@ HEADERS = {
 }
 
 TIMEOUT = httpx.Timeout(
-    connect=10.0,
+    connect=60.0,
     read=100.0,
     write=10.0,
     pool=10.0,

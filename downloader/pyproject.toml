@@ -8,8 +8,7 @@ version = "0.1.0"
 description = "Dilbert downloader"
 requires-python = ">=3.8"
 dependencies = [
-	"httpx>=0.24",
-	"tqdm>=4.65",
+    "httpx[socks]>=0.24",
 	"beautifulsoup4>=4.12",
 	"aiosqlite>=0.18",
 	"aiofiles>=25.1.0"
