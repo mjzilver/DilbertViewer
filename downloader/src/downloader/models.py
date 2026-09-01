@@ -52,11 +52,6 @@ class Progress:
             return 0.0
         return (self.completed / self.total) * 100.0
 
-        if not self.total:
-            return 100.0
-
-        return self.finished / self.total * 100
-
     def worker(self, worker_id: int) -> WorkerProgress:
         return self.workers.setdefault(worker_id, WorkerProgress())
 
