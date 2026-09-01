@@ -42,10 +42,15 @@ class Engine:
 
             await self.queue.join()
 
-            await self._stop_workers()
-
             if self._progress_task:
-                await self._progress_task
+                self._progress_task.cancel()
+                try:
+                    await self._progress_task
+                except asyncio.CancelledError:
+                    pass
+                self._progress_task = None
+
+            await self._stop_workers()
 
             self._log_summary()
 
@@ -196,16 +201,19 @@ class Engine:
                     self.progress.mark_idle(worker_id)
 
     async def _report_progress(self) -> None:
-        while self._progress_task is not None and not self._progress_task.done():
-            await asyncio.sleep(5)
-            if self.progress.total > 0:
-                logger.info(
-                    "Progress: %.1f%% | Completed: %d | Failed: %d | Active: %d",
-                    self.progress.percentage,
-                    self.progress.completed,
-                    self.progress.failed,
-                    self.progress.active,
-                )
+        try:
+            while True:
+                await asyncio.sleep(5)
+                if self.progress.total > 0:
+                    logger.info(
+                        "Progress: %.1f%% | Completed: %d | Failed: %d | Active: %d",
+                        self.progress.percentage,
+                        self.progress.completed,
+                        self.progress.failed,
+                        self.progress.active,
+                    )
+        except asyncio.CancelledError:
+            pass
 
     def _log_summary(self) -> None:
         logger.info(

@@ -1,5 +1,8 @@
+import asyncio
+import datetime
 import logging
 from pathlib import Path
+import re
 
 import aiofiles
 from bs4 import BeautifulSoup
@@ -19,6 +22,8 @@ logger = logging.getLogger(__name__)
 class ComicProcessor:
     def __init__(self, engine: "Engine"):
         self.engine = engine
+        self.year_cdx_cache: dict[int, dict[str, str]] = {}
+        self._cdx_lock = asyncio.Lock()
 
     async def process_comic(self, task: ComicTask) -> bool:
         date = task.date
@@ -38,7 +43,7 @@ class ComicProcessor:
         src_url = f"https://dilbert.com/strip/{date_str}"
 
         try:
-            result = await self._fetch_archive_page(src_url)
+            result = await self._fetch_archive_page(src_url, date)
 
             if result is None:
                 self.engine.existing_dates.add(date_str)
@@ -138,7 +143,68 @@ class ComicProcessor:
             bool(tags),
         )
 
-    async def _fetch_archive_page(self, src_url: str) -> tuple[bytes, str] | None:
+    async def _fetch_year_cdx(self, year: int) -> dict[str, str]:
+        cdx_url = (
+            f"https://web.archive.org/cdx/search/cdx?"
+            f"url=dilbert.com/strip/{year}-*"
+            "&fl=original,timestamp"
+            "&filter=statuscode:^2"
+            "&collapse=urlkey"
+        )
+        logger.info("Fetching batch CDX index for year %d...", year)
+        body, status = await fetch(self.engine.session, cdx_url)
+        if body is None:
+            logger.warning(
+                "Batch CDX fetch failed for year %d (status: %s), will use single-date fallback",
+                year,
+                status,
+            )
+            return {}
+
+        date_to_ts: dict[str, str] = {}
+        pattern = re.compile(r"/strip/(\d{4}-\d{2}-\d{2})")
+        for line in body.decode("utf-8", errors="ignore").splitlines():
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                orig, ts = parts[0], parts[1]
+                m = pattern.search(orig)
+                if m:
+                    date_to_ts[m.group(1)] = ts
+
+        logger.info(
+            "Batch CDX index for year %d loaded %d dates", year, len(date_to_ts)
+        )
+        return date_to_ts
+
+    async def _get_cached_or_fetch_year_timestamp(
+        self, date: datetime.date
+    ) -> str | None:
+        year = date.year
+        date_str = date.isoformat()
+
+        async with self._cdx_lock:
+            if year not in self.year_cdx_cache:
+                self.year_cdx_cache[year] = await self._fetch_year_cdx(year)
+
+        year_cache = self.year_cdx_cache.get(year, {})
+        return year_cache.get(date_str)
+
+    async def _fetch_archive_page(
+        self, src_url: str, date: datetime.date
+    ) -> tuple[bytes, str] | None:
+        batch_ts = await self._get_cached_or_fetch_year_timestamp(date)
+        if batch_ts:
+            archived_url = f"https://web.archive.org/web/{batch_ts}/{src_url}"
+            html, status = await fetch(self.engine.session, archived_url)
+            if html is not None:
+                return html, batch_ts
+            logger.warning(
+                "Archive fetch using batch CDX timestamp (%s) failed (%s) for %s; attempting single-date fallback",
+                batch_ts,
+                status,
+                src_url,
+            )
+
         cdx_url = (
             "https://web.archive.org/cdx/search/cdx?"
             f"url={src_url}"
